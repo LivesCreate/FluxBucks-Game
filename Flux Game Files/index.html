@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="background-color" content="#050508">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Flux">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="Flux">
+  <meta name="msapplication-TileColor" content="#0a0a0f">
+  <meta name="description" content="9 games - always shifting">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
+  <link rel="manifest" href="manifest.json">
+  <title>Flux</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body, #root { width: 100%; min-height: 100vh; min-height: 100dvh; background: #050508; overflow-x: hidden; }
+    body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
+    @supports (padding-top: env(safe-area-inset-top)) {
+      body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+             padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+    }
+    input, button { -webkit-user-select: auto; user-select: auto; }
+    #loading { position: fixed; inset: 0; background: #050508; display: flex; align-items: center;
+               justify-content: center; flex-direction: column; z-index: 9999;
+               font-family: sans-serif; color: #6b6b80; transition: opacity 0.5s; }
+    #loading.hide { opacity: 0; pointer-events: none; }
+    #loading .star { font-size: 48px; margin-bottom: 16px; animation: loadPulse 1.5s ease-in-out infinite; }
+    @keyframes loadPulse { 0%,100% { opacity: 0.4; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); } }
+  </style>
+</head>
+<body>
+  <div id="loading"><div class="star">✦</div><div>Loading...</div></div>
+  <div id="root"></div>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script type="text/babel" data-type="module">
+const { useState, useEffect, useRef, useCallback } = React;
+const VERSION = "v2.2.0";
+
+const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
+
+const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const uid = () => Math.random().toString(36).slice(2, 9);
+const delay = (t) => new Promise((r) => setTimeout(r, t));
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+const SUITS = ["♠", "♥", "♦", "♣"];
+const SUIT_NAMES = { "♠": "Spades", "♥": "Hearts", "♦": "Diamonds", "♣": "Clubs" };
+const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+const RANK_NAMES = { A:"Ace","2":"Two","3":"Three","4":"Four","5":"Five","6":"Six","7":"Seven","8":"Eight","9":"Nine","10":"Ten",J:"Jack",Q:"Queen",K:"King" };
+const cardVal = (r) => { if (r === "A") return 11; if (r === "J" || r === "Q" || r === "K") return 10; return parseInt(r, 10); };
+const cardNum = (r) => RANKS.indexOf(r);
+function mkDeck() {
+  const d = [];
+  for (const s of SUITS) for (const r of RANKS) d.push({ suit: s, rank: r, id: uid() });
+  for (let i = d.length - 1; i > 0; i--) { const j = rand(0, i); [d[i], d[j]] = [d[j], d[i]]; }
+  return d;
+}
+
+const SLOT_SYMS = ["🍒","🍋","🔔","⭐","💎","7️⃣","🍀","🎰"];
+const SLOT_PAY = {"7️⃣":50,"💎":30,"⭐":20,"🔔":15,"🍀":12,"🍒":8,"🍋":5,"🎰":40};
+
+const CSS = `
+:root{--bg:#0a0a0f;--surface:#12121cdd;--surface2:#1a1a2edd;--border:#2a2a40;--neon:#ff8c42;--neon2:#ffcf56;--accent:#ff5e78;--cool:#56c1ff;--green:#4ade80;--text:#e8e8f0;--dim:#6b6b80;--card:#fdfaf5}
+*{box-sizing:border-box;margin:0;padding:0}
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes popIn{0%{opacity:0;transform:scale(0.6)}70%{transform:scale(1.08)}100%{opacity:1;transform:scale(1)}}
+@keyframes popBounce{0%{transform:scale(0.5)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes neonPulse{0%,100%{text-shadow:0 0 8px #c084fc,0 0 18px #8b5cf6}50%{text-shadow:0 0 14px #c084fc,0 0 32px #8b5cf6,0 0 48px #6366f1}}
+@keyframes cosmicShimmer{0%{background-position:200% 50%}100%{background-position:-200% 50%}}
+@keyframes starRotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes flipIn{from{transform:rotateY(90deg);opacity:0}to{transform:rotateY(0);opacity:1}}
+@keyframes flashGreen{0%{box-shadow:0 0 0 rgba(74,222,128,0)}50%{box-shadow:0 0 28px rgba(74,222,128,0.4)}100%{box-shadow:0 0 0 rgba(74,222,128,0)}}
+@keyframes flashRed{0%{box-shadow:0 0 0 rgba(255,94,120,0)}50%{box-shadow:0 0 28px rgba(255,94,120,0.4)}100%{box-shadow:0 0 0 rgba(255,94,120,0)}}
+@keyframes chipBounce{0%{transform:scale(1)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes winShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes cardDeal{from{opacity:0;transform:translateY(-36px) rotate(-5deg) scale(0.85)}to{opacity:1;transform:translateY(0) rotate(0) scale(1)}}
+@keyframes coinSpin{0%{transform:rotateY(0)}100%{transform:rotateY(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+@keyframes reelDrop{from{transform:translateY(-14px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes staggerPop{0%{opacity:0;transform:scale(0.3) translateY(35px)}50%{transform:scale(1.16) translateY(-8px)}75%{transform:scale(0.95) translateY(2px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+button{font-family:'Outfit',sans-serif;cursor:pointer;border:none;transition:all 0.22s cubic-bezier(0.34,1.56,0.64,1)}
+button:hover:not(:disabled){transform:translateY(-2px) scale(1.03);filter:brightness(1.12)}
+button:active:not(:disabled){transform:translateY(1px) scale(0.97)}
+button:disabled{cursor:not-allowed;opacity:0.35}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+`;
+
+/* ═══════════ STARFIELD BACKGROUND ═══════════════════════════════ */
+function Starfield() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.scale(dpr, dpr);
+
+    // Text exclusion zone: center area where title/cards render
+    // Stars spawning here get pushed to edges
+    function isInTextZone(x, y) {
+      var cx = W / 2, zoneW = Math.min(420, W * 0.55), zoneH = H * 0.65;
+      var zoneTop = H * 0.02;
+      return x > cx - zoneW / 2 && x < cx + zoneW / 2 && y > zoneTop && y < zoneTop + zoneH;
+    }
+
+    // === WHITE STARS ===
+    const stars = [];
+    for (let i = 0; i < 180; i++) {
+      let sx = Math.random() * W, sy = Math.random() * H;
+      // If star lands in text zone, push it to the edges
+      if (isInTextZone(sx, sy)) {
+        if (Math.random() < 0.5) sx = Math.random() * W * 0.15;
+        else sx = W - Math.random() * W * 0.15;
+        sy = Math.random() * H;
+      }
+      stars.push({
+        x: sx, y: sy,
+        r: Math.random() * 1.8 + 0.3,
+        brightness: Math.random() * 0.6 + 0.25,
+        baseBrightness: 0,
+        twinkleSpeed: Math.random() * 0.02 + 0.004,
+        twinkleOffset: Math.random() * Math.PI * 2,
+        flare: 0, // 0 = normal, >0 = flaring up
+        replacing: false, // true = sliding in from outside
+        replaceVx: 0, replaceVy: 0, replaceLife: 0,
+      });
+      stars[stars.length - 1].baseBrightness = stars[stars.length - 1].brightness;
+    }
+    let flareTimer = 0;
+    let replaceTimer = 0;
+
+    // === SCROLLING PLANETS ===
+    // Realistic: very slow, slight orbital drift, barely perceptible motion
+    const planetDefs = [
+      { r: 10, c1: "#ff8c42", c2: "#b5451a", ring: true, opacity: 0.18 },
+      { r: 7, c1: "#6366f1", c2: "#3730a3", ring: false, opacity: 0.14 },
+      { r: 5, c1: "#56c1ff", c2: "#1d4ed8", ring: false, opacity: 0.12 },
+      { r: 12, c1: "#c084fc", c2: "#7c3aed", ring: true, opacity: 0.15 },
+      { r: 6, c1: "#4ade80", c2: "#166534", ring: false, opacity: 0.1 },
+    ];
+    const planets = [];
+    function spawnPlanet(initial) {
+      const def = planetDefs[Math.floor(Math.random() * planetDefs.length)];
+      const fromLeft = Math.random() < 0.5;
+      // Realistic: planets move very slowly, slight arc (sinusoidal y drift)
+      const speed = 0.015 + Math.random() * 0.03; // much slower than before
+      planets.push({
+        x: initial ? Math.random() * W : (fromLeft ? -40 : W + 40),
+        y: Math.random() * H * 0.85 + H * 0.05,
+        baseY: 0,
+        vx: (fromLeft || (initial && Math.random() < 0.5) ? 1 : -1) * speed,
+        drift: Math.random() * 0.0003 + 0.0001, // very slow sinusoidal y drift
+        driftOffset: Math.random() * Math.PI * 2,
+        driftAmp: 15 + Math.random() * 25,
+        r: def.r + Math.random() * 3,
+        c1: def.c1, c2: def.c2,
+        ring: def.ring,
+        opacity: def.opacity * (0.7 + Math.random() * 0.3),
+      });
+      planets[planets.length - 1].baseY = planets[planets.length - 1].y;
+    }
+    for (let i = 0; i < 3; i++) spawnPlanet(true);
+    let planetTimer = 0;
+
+    // === COLORED STARS (heading toward a planet) ===
+    const colorStars = [];
+    let colorStarTimer = 0;
+
+    // === SPARKS from planet collisions ===
+    const sparks = [];
+
+    // === NORMAL SHOOTING STARS (white) ===
+    const shooters = [];
+    let shootTimer = 0;
+
+    let frame = 0;
+    let animId;
+
+    function spawnShooter() {
+      const fromLeft = Math.random() < 0.5;
+      shooters.push({
+        x: fromLeft ? Math.random() * W * 0.3 : W * 0.7 + Math.random() * W * 0.3,
+        y: Math.random() * H * 0.4,
+        vx: (fromLeft ? 1 : -1) * (3 + Math.random() * 4),
+        vy: 2 + Math.random() * 2.5,
+        life: 1, decay: 0.012 + Math.random() * 0.008,
+        len: 30 + Math.random() * 50,
+      });
+    }
+
+    function spawnColorStar() {
+      // Pick a planet to target
+      if (planets.length === 0) return;
+      const target = planets[Math.floor(Math.random() * planets.length)];
+      // Spawn from a random edge, heading toward the planet
+      const edge = Math.floor(Math.random() * 4);
+      let sx, sy;
+      if (edge === 0) { sx = Math.random() * W; sy = -10; }
+      else if (edge === 1) { sx = W + 10; sy = Math.random() * H; }
+      else if (edge === 2) { sx = Math.random() * W; sy = H + 10; }
+      else { sx = -10; sy = Math.random() * H; }
+      const dx = target.x - sx, dy = target.y - sy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const speed = 0.8 + Math.random() * 1.2;
+      const hue = Math.random() < 0.5 ? (15 + Math.random() * 25) : (0 + Math.random() * 15); // orange or red
+      colorStars.push({
+        x: sx, y: sy,
+        vx: (dx / dist) * speed, vy: (dy / dist) * speed,
+        targetPlanet: target,
+        r: 1.5 + Math.random() * 1,
+        hue: hue,
+        life: 1,
+        trail: [],
+      });
+    }
+
+    function spawnExplosion(x, y, hue) {
+      const count = 12 + Math.floor(Math.random() * 10);
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.5 + Math.random() * 3;
+        sparks.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1, decay: 0.015 + Math.random() * 0.02,
+          r: 0.5 + Math.random() * 2,
+          hue: hue + (Math.random() - 0.5) * 20,
+        });
+      }
+    }
+
+    let lastTime = performance.now();
+    const TARGET_DT = 1000 / 60; // normalize to 60fps
+    const MAX_DT = 1000 / 2; // cap minimum fps at 2 to prevent huge jumps
+    const MIN_FRAME_TIME = 1000 / 500; // cap at 500Hz max
+
+    function draw(now) {
+      if (!now) now = performance.now();
+      var rawDt = now - lastTime;
+      if (rawDt < MIN_FRAME_TIME) { animId = requestAnimationFrame(draw); return; } // skip if >500Hz
+      lastTime = now;
+      var dt = Math.min(rawDt, MAX_DT) / TARGET_DT; // dt=1.0 at 60fps, 0.5 at 120fps, etc
+      frame++;
+      ctx.clearRect(0, 0, W, H);
+
+      // BG gradient
+      const bg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.7);
+      bg.addColorStop(0, "#0e0e18");
+      bg.addColorStop(1, "#050508");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Very subtle nebula wash
+      ctx.globalAlpha = 0.015;
+      const nb1 = ctx.createRadialGradient(W * 0.25, H * 0.2, 0, W * 0.25, H * 0.2, 180);
+      nb1.addColorStop(0, "#ff8c42"); nb1.addColorStop(1, "transparent");
+      ctx.fillStyle = nb1; ctx.fillRect(0, 0, W, H);
+      const nb2 = ctx.createRadialGradient(W * 0.75, H * 0.7, 0, W * 0.75, H * 0.7, 220);
+      nb2.addColorStop(0, "#4338ca"); nb2.addColorStop(1, "transparent");
+      ctx.fillStyle = nb2; ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+
+      // === DRAW PLANETS (scrolling, faint, realistic slow drift) ===
+      const isReduced = !!window.__neonReduceAnim;
+      planetTimer++;
+      if (planetTimer > 800 + Math.random() * 1200) {
+        if (planets.length < 6) spawnPlanet(false);
+        planetTimer = 0;
+      }
+      for (let i = planets.length - 1; i >= 0; i--) {
+        const p = planets[i];
+        p.x += p.vx * dt; // dt-scaled horizontal
+        p.driftOffset += p.drift * dt; // dt-scaled drift
+        p.y = p.baseY + Math.sin(p.driftOffset) * p.driftAmp;
+        if (p.x < -60 || p.x > W + 60) {
+          planets.splice(i, 1); continue;
+        }
+        // Draw planet body
+        ctx.globalAlpha = p.opacity;
+        const pg = ctx.createRadialGradient(p.x - p.r * 0.3, p.y - p.r * 0.3, 0, p.x, p.y, p.r);
+        pg.addColorStop(0, p.c1); pg.addColorStop(1, p.c2);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = pg; ctx.fill();
+        // Subtle atmosphere glow
+        ctx.globalAlpha = p.opacity * 0.3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 1.6, 0, Math.PI * 2);
+        const atmo = ctx.createRadialGradient(p.x, p.y, p.r * 0.8, p.x, p.y, p.r * 1.6);
+        atmo.addColorStop(0, p.c1 + "44"); atmo.addColorStop(1, "transparent");
+        ctx.fillStyle = atmo; ctx.fill();
+        // Ring
+        if (p.ring) {
+          ctx.globalAlpha = p.opacity * 0.5;
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, p.r * 2.2, p.r * 0.4, -0.15, 0, Math.PI * 2);
+          ctx.strokeStyle = p.c1 + "66"; ctx.lineWidth = 1; ctx.stroke();
+        }
+      }
+      ctx.globalAlpha = 1;
+
+      // === STAR FLARE/DIM + REPLACEMENT EFFECTS ===
+      if (!isReduced) {
+        flareTimer++;
+        if (flareTimer > 90 + Math.random() * 180) {
+          flareTimer = 0;
+          // Pick a random star to flare
+          const idx = Math.floor(Math.random() * stars.length);
+          if (!stars[idx].replacing) stars[idx].flare = 1.0;
+        }
+        replaceTimer++;
+        if (replaceTimer > 400 + Math.random() * 600) {
+          replaceTimer = 0;
+          // Pick a random star to fade out and replace with one sliding in
+          const idx = Math.floor(Math.random() * stars.length);
+          if (!stars[idx].replacing) {
+            stars[idx].replacing = true;
+            stars[idx].replaceLife = 1.0; // fade out phase
+            // New target position avoids text zone
+            let tx, ty, attempts = 0;
+            do { tx = Math.random() * W; ty = Math.random() * H; attempts++; } while (isInTextZone(tx, ty) && attempts < 20);
+            // Slide from a random edge
+            const edge = Math.floor(Math.random() * 4);
+            let sx, sy;
+            if (edge === 0) { sx = -10; sy = Math.random() * H; }
+            else if (edge === 1) { sx = W + 10; sy = Math.random() * H; }
+            else if (edge === 2) { sx = Math.random() * W; sy = -10; }
+            else { sx = Math.random() * W; sy = H + 10; }
+            stars[idx].replaceVx = (tx - sx) * 0.015;
+            stars[idx].replaceVy = (ty - sy) * 0.015;
+            stars[idx].x = sx; stars[idx].y = sy;
+          }
+        }
+      }
+
+      // === DRAW WHITE STARS ===
+      for (const s of stars) {
+        // Handle replacement slide (dt-scaled)
+        if (s.replacing) {
+          s.replaceLife -= 0.008 * dt;
+          s.x += s.replaceVx * dt;
+          s.y += s.replaceVy * dt;
+          if (s.replaceLife <= 0) {
+            s.replacing = false;
+            s.replaceLife = 0;
+            s.brightness = s.baseBrightness;
+          }
+        }
+        // Handle flare decay
+        if (s.flare > 0) {
+          s.flare -= 0.012 * dt;
+          if (s.flare < 0) s.flare = 0;
+        }
+        const twinkle = Math.sin(frame * s.twinkleSpeed + s.twinkleOffset) * 0.3 + 0.7;
+        const flareBoost = s.flare * 0.6; // flare brightens considerably
+        const alpha = Math.min(1, (s.brightness + flareBoost) * twinkle);
+        const flareSizeBoost = 1 + s.flare * 0.8;
+        ctx.globalAlpha = s.replacing ? alpha * 0.6 : alpha;
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r * flareSizeBoost, 0, Math.PI * 2);
+        ctx.fillStyle = s.flare > 0.3 ? "#ffffee" : "#ffffff"; ctx.fill();
+        if (s.r > 1.2 || s.flare > 0.2) {
+          ctx.globalAlpha = (s.replacing ? alpha * 0.06 : alpha * 0.12) * (1 + s.flare * 2);
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 3 * flareSizeBoost, 0, Math.PI * 2);
+          ctx.fillStyle = "#ffffff"; ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+
+      // === WHITE SHOOTING STARS ===
+      shootTimer++;
+      if (shootTimer > 200 + Math.random() * 300) { spawnShooter(); shootTimer = 0; }
+      for (let i = shooters.length - 1; i >= 0; i--) {
+        const s = shooters[i];
+        s.x += s.vx * dt; s.y += s.vy * dt; s.life -= s.decay * dt;
+        if (s.life <= 0) { shooters.splice(i, 1); continue; }
+        ctx.globalAlpha = s.life * 0.7;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(s.x, s.y);
+        ctx.lineTo(s.x - s.vx * (s.len / 5), s.y - s.vy * (s.len / 5));
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff"; ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // === COLORED STARS heading toward planets ===
+      colorStarTimer++;
+      if (colorStarTimer > 300 + Math.random() * 500) { spawnColorStar(); colorStarTimer = 0; }
+      for (let i = colorStars.length - 1; i >= 0; i--) {
+        const cs = colorStars[i];
+        cs.x += cs.vx * dt; cs.y += cs.vy * dt;
+        // Save trail
+        cs.trail.push({ x: cs.x, y: cs.y });
+        if (cs.trail.length > 20) cs.trail.shift();
+
+        // Check collision with its target planet
+        const tp = cs.targetPlanet;
+        const dx = cs.x - tp.x, dy = cs.y - tp.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < tp.r + 4) {
+          // COLLISION! Explosion + brief planet flash
+          spawnExplosion(cs.x, cs.y, cs.hue);
+          tp.opacity = Math.min(0.45, tp.opacity + 0.12); // planet briefly brightens
+          setTimeout(function() { tp.opacity = Math.max(0.08, tp.opacity - 0.12); }, 600);
+          colorStars.splice(i, 1);
+          continue;
+        }
+        // Remove if went way offscreen (missed)
+        if (cs.x < -80 || cs.x > W + 80 || cs.y < -80 || cs.y > H + 80) {
+          colorStars.splice(i, 1); continue;
+        }
+
+        // Draw trail
+        for (let j = 0; j < cs.trail.length; j++) {
+          const t = cs.trail[j];
+          const alpha = (j / cs.trail.length) * 0.4;
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, cs.r * (j / cs.trail.length) * 0.7, 0, Math.PI * 2);
+          ctx.fillStyle = "hsl(" + cs.hue + ",100%,70%)";
+          ctx.fill();
+        }
+        // Draw head
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath(); ctx.arc(cs.x, cs.y, cs.r, 0, Math.PI * 2);
+        ctx.fillStyle = "hsl(" + cs.hue + ",100%,75%)";
+        ctx.fill();
+        // Bright core
+        ctx.beginPath(); ctx.arc(cs.x, cs.y, cs.r * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = "hsl(" + cs.hue + ",100%,92%)";
+        ctx.fill();
+        // Glow
+        ctx.globalAlpha = 0.2;
+        ctx.beginPath(); ctx.arc(cs.x, cs.y, cs.r * 3, 0, Math.PI * 2);
+        ctx.fillStyle = "hsl(" + cs.hue + ",100%,65%)";
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // === SPARKS from collisions ===
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        s.x += s.vx * dt; s.y += s.vy * dt;
+        var damp = Math.pow(0.97, dt); s.vx *= damp; s.vy *= damp;
+        s.life -= s.decay * dt;
+        if (s.life <= 0) { sparks.splice(i, 1); continue; }
+        ctx.globalAlpha = s.life * 0.9;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * s.life, 0, Math.PI * 2);
+        ctx.fillStyle = "hsl(" + s.hue + ",100%," + Math.round(50 + s.life * 40) + "%)";
+        ctx.fill();
+        // Extra glow on fresh sparks
+        if (s.life > 0.6) {
+          ctx.globalAlpha = (s.life - 0.6) * 0.4;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
+          ctx.fillStyle = "hsl(" + s.hue + ",100%,80%)";
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+
+      animId = requestAnimationFrame(draw);
+    }
+
+    draw();
+
+    const handleResize = () => {
+      W = window.innerWidth; H = window.innerHeight;
+      const dpr2 = window.devicePixelRatio || 1;
+      canvas.width = W * dpr2; canvas.height = H * dpr2;
+      canvas.style.width = W + "px"; canvas.style.height = H + "px";
+      ctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", handleResize); };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: 0, pointerEvents: "none" }}
+    />
+  );
+}
+
+/* ═══════════ SHARED COMPONENTS ══════════════════════════════════ */
+
+function Chip({ amount }) {
+  const [anim, setAnim] = useState(false);
+  const prev = useRef(amount);
+  useEffect(() => {
+    if (amount !== prev.current) { setAnim(true); prev.current = amount; const t = setTimeout(() => setAnim(false), 500); return () => clearTimeout(t); }
+  }, [amount]);
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 14px", background: "var(--surface2)", borderRadius: 24, border: "1px solid var(--border)", animation: anim ? "chipBounce 0.4s" : "none", backdropFilter: "blur(8px)" }}>
+      <span style={{ fontSize: 16 }}>🪙</span>
+      <AnimNum value={amount} color="var(--neon2)" size={18} />
+    </div>
+  );
+}
+
+function AnimNum({ value, color, size }) {
+  const [disp, setDisp] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    const from = prev.current; const to = value;
+    if (from === to) return; prev.current = to;
+    const start = performance.now();
+    const tick = (now) => { const t = clamp((now - start) / 400, 0, 1); setDisp(Math.round(from + (to - from) * (1 - Math.pow(1 - t, 3)))); if (t < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }, [value]);
+  return <span style={{ color: color || "var(--neon)", fontSize: size || 18, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>{disp.toLocaleString()}</span>;
+}
+
+function Btn({ children, onClick, color, disabled, glow }) {
+  const c = color || "var(--neon)";
+  return <button disabled={disabled} onClick={disabled ? undefined : onClick} style={{ fontSize: 14, fontWeight: 700, padding: "10px 24px", background: disabled ? "#222" : "linear-gradient(135deg," + c + "," + c + "cc)", color: disabled ? "#444" : "#fff", borderRadius: 10, border: disabled ? "2px solid #333" : "2px solid " + c, boxShadow: glow && !disabled ? "0 0 16px " + c + "44" : "none" }}>{children}</button>;
+}
+
+function GameBtn({ children, onClick, color, disabled, icon }) {
+  const c = color || "var(--neon)";
+  return <button disabled={disabled} onClick={disabled ? undefined : onClick} style={{ fontSize: 15, fontWeight: 700, padding: "12px 28px", background: disabled ? "#222" : "linear-gradient(135deg," + c + "20," + c + "10)", color: disabled ? "#444" : c, borderRadius: 12, border: "2px solid " + (disabled ? "#333" : c), boxShadow: disabled ? "none" : "0 0 14px " + c + "1a,inset 0 0 14px " + c + "08", display: "inline-flex", alignItems: "center", gap: 8 }}>{icon && <span style={{ fontSize: 18 }}>{icon}</span>}{children}</button>;
+}
+
+function PlayingCard({ card, hidden, cardDelay, small, highlight }) {
+  const d = cardDelay || 0;
+  const [show, setShow] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setShow(true), d); return () => clearTimeout(t); }, [d]);
+  const w = small ? 52 : 70, h = small ? 76 : 100;
+  if (!show) return <div style={{ width: w, height: h, flexShrink: 0 }} />;
+  if (hidden) return <div style={{ width: w, height: h, borderRadius: 8, flexShrink: 0, background: "linear-gradient(135deg,#1a1a3e,#2d1b4e)", border: "2px solid #3d2d5e", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 3px 12px rgba(0,0,0,0.4)", animation: "cardDeal 0.35s ease-out both" }}><span style={{ fontSize: small ? 18 : 24, opacity: 0.4 }}>🂠</span></div>;
+  const isRed = card.suit === "♥" || card.suit === "♦";
+  const col = isRed ? "#c0392b" : "#1a1a2e";
+  return <div style={{ width: w, height: h, borderRadius: 8, padding: small ? 4 : 6, flexShrink: 0, background: "var(--card)", border: highlight ? "2px solid var(--neon)" : "2px solid #d0d0d0", boxShadow: highlight ? "0 0 16px rgba(255,140,66,0.27)" : "0 3px 12px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", justifyContent: "space-between", animation: "flipIn 0.3s ease-out both", fontFamily: "'Playfair Display',serif", color: col, userSelect: "none" }}>
+    <div style={{ fontSize: small ? 14 : 18, fontWeight: 900, lineHeight: 1 }}>{card.rank}</div>
+    <div style={{ fontSize: small ? 16 : 22, textAlign: "center" }}>{card.suit}</div>
+    <div style={{ fontSize: small ? 14 : 18, fontWeight: 900, lineHeight: 1, textAlign: "right", transform: "rotate(180deg)" }}>{card.rank}</div>
+  </div>;
+}
+
+function CardLabel({ card }) {
+  if (!card) return null;
+  return <div style={{ fontSize: 11, color: "var(--dim)", textAlign: "center", marginTop: 3 }}>{RANK_NAMES[card.rank]} of {SUIT_NAMES[card.suit]}</div>;
+}
+
+function ResultBanner({ text, type, show }) {
+  if (!show || !text) return null;
+  const w = type === "win";
+  return <div style={{ textAlign: "center", padding: "12px 20px", borderRadius: 14, margin: "10px 0", background: w ? "linear-gradient(135deg,rgba(74,222,128,0.12),rgba(74,222,128,0.04))" : "linear-gradient(135deg,rgba(255,94,120,0.12),rgba(255,94,120,0.04))", border: "1px solid " + (w ? "rgba(74,222,128,0.25)" : "rgba(255,94,120,0.25)"), animation: w ? "flashGreen 0.8s,popBounce 0.35s" : "flashRed 0.8s,shake 0.35s" }}><div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 900, fontStyle: "italic", color: w ? "var(--green)" : "var(--accent)" }}>{text}</div></div>;
+}
+
+function BetSelector({ bet, setBet, chips, presets }) {
+  const ps = presets || [10, 25, 50, 100, 250];
+  return <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+    <span style={{ color: "var(--dim)", fontSize: 12, fontWeight: 600 }}>BET:</span>
+    {ps.map(function(v) { return <button key={v} onClick={function(){ setBet(v); }} style={{ padding: "5px 12px", borderRadius: 7, fontSize: 13, fontWeight: 700, background: bet === v ? "var(--neon)" : "var(--surface2)", color: bet === v ? "#000" : (v > chips ? "var(--accent)" : "var(--dim)"), border: bet === v ? "2px solid var(--neon)" : (v > chips ? "1px solid var(--accent)" : "1px solid var(--border)"), fontFamily: "'JetBrains Mono',monospace", opacity: v > chips ? 0.7 : 1 }}>{v}</button>; })}
+    <button onClick={function(){ setBet(Math.max(chips, 1)); }} style={{ padding: "5px 14px", borderRadius: 7, fontSize: 12, fontWeight: 800, background: bet === Math.max(chips, 1) ? "linear-gradient(135deg,var(--accent),#d32f5a)" : "var(--surface2)", color: bet === Math.max(chips, 1) ? "#fff" : "var(--accent)", border: "2px solid var(--accent)", fontFamily: "'JetBrains Mono',monospace", letterSpacing: 0.5 }}>ALL IN</button>
+  </div>;
+}
+
+function checkDebt(bet, chips, setBet, setDebtPopup, doStart) {
+  if (bet > chips) {
+    setDebtPopup({
+      onDebt: doStart,
+      onAfford: function(){ var safe = Math.max(1, Math.min(bet, chips)); setBet(safe); }
+    });
+    return true;
+  }
+  return false;
+}
+
+function BackBtn({ onClick }) { return <button onClick={onClick} style={{ position: "absolute", top: 14, left: 14, padding: "7px 16px", borderRadius: 9, background: "var(--surface2)", color: "var(--text)", fontSize: 13, fontWeight: 600, border: "1px solid var(--border)", zIndex: 10, backdropFilter: "blur(8px)" }}>← Back</button>; }
+
+function Panel({ children, style: s }) { return <div style={{ background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", padding: 20, animation: "fadeUp 0.35s", position: "relative", backdropFilter: "blur(12px)", ...s }}>{children}</div>; }
+
+function Tag({ label, value, color }) { return <div style={{ background: "var(--surface2)", padding: "4px 10px", borderRadius: 7, border: "1px solid var(--border)", display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ fontSize: 10, color: "var(--dim)", fontWeight: 700, letterSpacing: 0.5 }}>{label}</span><span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontWeight: 700, fontSize: 14 }}>{value}</span></div>; }
+
+function GameGuide({ items, title }) {
+  const [open, setOpen] = useState(false);
+  return <div style={{ background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginTop: 14, overflow: "hidden", backdropFilter: "blur(8px)" }}>
+    <button onClick={function(){ setOpen(!open); }} style={{ width: "100%", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "transparent", color: "var(--neon)", border: "none", fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase" }}>
+      <span>📖 {title || "How to Play"}</span>
+      <span style={{ transition: "transform 0.3s", transform: open ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
+    </button>
+    {open && <div style={{ padding: "0 14px 14px", animation: "fadeUp 0.2s" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {items.map(function(item, i) { return <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--neon)", marginTop: 6, flexShrink: 0 }} /><div style={{ fontSize: 13, lineHeight: 1.5 }}><span style={{ fontWeight: 700, color: "var(--text)" }}>{item.t}</span><span style={{ color: "var(--dim)" }}>{" — " + item.d}</span></div></div>; })}
+      </div>
+    </div>}
+  </div>;
+}
+
+function BrokeBanner({ chips, setChips }) {
+  if (chips > 0) return null;
+  var isNegative = chips < 0;
+  return <div style={{ textAlign: "center", padding: 18, background: "linear-gradient(135deg,rgba(255,94,120,0.1),rgba(255,94,120,0.03))", borderRadius: 14, border: "1px solid rgba(255,94,120,0.2)", margin: "12px 0", animation: "shake 0.5s" }}>
+    <div style={{ fontSize: 32, marginBottom: 4 }}>💸</div>
+    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 900, color: "var(--accent)", marginBottom: 6 }}>{isNegative ? "In Debt!" : "You're Broke!"}</div>
+    <p style={{ color: "var(--dim)", fontSize: 13, marginBottom: 12 }}>{isNegative ? "Clear your debt first, then claim free chips." : "Here's 10 chips to try again."}</p>
+    {isNegative ? <Btn onClick={function(){ setChips(0); }} color="var(--accent)" glow>Clear Debt to 0</Btn>
+    : <Btn onClick={function(){ setChips(10); }} color="var(--green)" glow>Claim 10 Chips</Btn>}
+  </div>;
+}
+
+function GameWrap({ children, title, titleColor, chips, setChips, onBack, safeMode }) {
+  return <div style={{ position: "relative", minHeight: "100vh", padding: "16px 14px" }}>
+    <BackBtn onClick={onBack} />
+    <div style={{ maxWidth: 520, margin: "0 auto", paddingTop: 52 }}>
+      <div style={{ textAlign: "center", marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 24, color: titleColor, fontStyle: "italic", animation: "fadeDown 0.35s" }}>{title}</h2>
+        {!safeMode && <div style={{ marginTop: 6 }}><Chip amount={chips} /></div>}
+      </div>
+      {children}
+    </div>
+  </div>;
+}
+
+/* GUIDE DATA */
+const BJ_G=[{t:"Number Cards (2-10)",d:"Worth their face value. A 7 is worth 7 points, a 2 is worth 2, and so on. These make up the bulk of the deck."},{t:"Face Cards (J, Q, K)",d:"Jack, Queen, and King are all worth exactly 10 points. They're interchangeable in value — a King is no better than a Jack."},{t:"Ace",d:"The most flexible card. Worth 11 by default, but automatically drops to 1 if counting it as 11 would put your hand over 21 (bust). A hand with an Ace counted as 11 is called a 'soft' hand."},{t:"Hit",d:"Take another card from the deck to increase your hand total. Use when your hand is low (below 16) and you want to get closer to 21. The risk is going over 21 and busting, which is an instant loss."},{t:"Stand",d:"Keep your current hand and end your turn. The dealer then reveals their hidden card and must draw until they reach at least 17. Stand when you're satisfied with your total or the bust risk is too high."},{t:"Double Down",d:"Double your original bet and receive exactly one more card, then automatically stand. Best used when your hand totals 10 or 11 — you have a strong chance of landing 20 or 21 with one card."},{t:"Bust",d:"If your hand total exceeds 21, you bust and instantly lose your bet regardless of what the dealer has. The dealer doesn't even need to play their hand."},{t:"Blackjack",d:"An Ace plus any 10-value card (10, J, Q, K) dealt as your first two cards. This is the best possible hand and pays out at 1.5x your bet instead of the normal 1x."},{t:"Dealer Rules",d:"The dealer must hit on 16 or below and stand on 17 or above. They have no choice — it's automatic. This means the dealer can also bust, which is how you win even with a mediocre hand."}];
+const HL_G=[{t:"Card Rankings",d:"Cards rank from lowest to highest: Ace, 2, 3, 4, 5, 6, 7, 8, 9, 10, Jack, Queen, King. Suit doesn't matter."},{t:"Higher / Lower",d:"After seeing your card, guess whether the next card drawn will be higher or lower in rank."},{t:"Equal = Correct",d:"If the next card is the same rank as yours, your guess counts as correct either way."},{t:"Streak Multiplier",d:"Each correct guess increases your multiplier. The longer your streak, the more you earn."},{t:"Cash Out",d:"Take your winnings at any point during your streak. If you guess wrong, you lose everything."}];
+const SL_G=[{t:"Triple Match",d:"All 3 reels land on the same symbol. This is the jackpot — pays out the biggest win depending on which symbol matched."},{t:"Pair Match",d:"2 out of 3 reels match. Pays a smaller win but happens much more often than triples."},{t:"No Match",d:"All 3 reels show different symbols. You lose your bet. This is the most common outcome."},{t:"Symbol Values",d:"Different symbols have different payout multipliers. Rarer symbols pay more when matched."}];
+const CL_G=[{t:"Heads / Tails",d:"Each rung of the ladder presents a coin flip. Pick heads or tails — 50/50 chance each time."},{t:"Climbing",d:"Each correct guess moves you up one rung. Higher rungs have bigger multipliers applied to your bet."},{t:"Cash Out",d:"At any rung, you can take your current winnings and walk away safely. Greed is the enemy."},{t:"Wrong Guess",d:"One wrong call and you lose your entire bet. All progress is wiped out. The risk increases with each rung."}];
+const MM_G=[{t:"Entry Fee",d:"Your bet is deducted when you start. This is the cost to play the round."},{t:"Gameplay",d:"Flip two cards per turn trying to find matching pairs. Remember card positions to match them faster."},{t:"Wrong Penalty",d:"Each failed match (non-matching pair) costs you 5 chips from your potential winnings."},{t:"Win Condition",d:"Successfully match all 8 pairs before running out of moves. Remaining moves bonus your payout."},{t:"Lose",d:"Run out of all 20 moves before matching every pair and you lose your bet."}];
+const MI_G=[{t:"Grid Setup",d:"5x5 grid with hidden mines. You choose how many mines: 3 (easy), 5 (medium), or 10 (hard). More mines = higher multipliers."},{t:"Safe Tile",d:"Revealing a safe tile increases your running multiplier. Each safe tile found raises the payout."},{t:"Mine",d:"Hit a mine and you instantly lose your entire bet. Game over — all progress lost."},{t:"Cash Out",d:"After revealing any safe tiles, cash out to lock in your current multiplier. Don't push your luck too far."}];
+const PL_G=[{t:"Ball Drop",d:"A ball drops from the top and bounces through rows of pegs using realistic physics. Each bounce is random."},{t:"Slots",d:"The bottom has multiple landing slots, each with a different multiplier. Center slots pay less, edges pay more."},{t:"Risk Levels",d:"Low risk = multipliers cluster near 1x (steady). High risk = extreme edges pay big but center pays almost nothing."}];
+const LI_G=[{t:"Target Multiplier",d:"Set a target between 1.2x and 100x. Lower targets are easier to hit but pay less."},{t:"Win Condition",d:"A random number is rolled. If the roll is greater than or equal to your target, you win bet × target!"},{t:"Lose Condition",d:"If the roll comes in below your target, you lose your entire bet."},{t:"Dynamic Odds",d:"The game tracks repeated easy rolls. If you keep picking low targets, win probability gradually decreases. Switch targets to reset the odds."}];
+
+/* ═══ GAME 1: BLACKJACK ══════════════════════════════════════════ */
+function Blackjack({ chips, setChips, onBack, safeMode, setDebtPopup }) {
+  const [phase, setPhase] = useState("bet");
+  const [bet, setBet] = useState(25);
+  const [deck, setDeck] = useState([]);
+  const [player, setPlayer] = useState([]);
+  const [dealer, setDealer] = useState([]);
+  const [result, setResult] = useState(null);
+  const [dReveal, setDReveal] = useState(false);
+
+  function hv(hand) { let t = 0, a = 0; for (let i = 0; i < hand.length; i++) { t += cardVal(hand[i].rank); if (hand[i].rank === "A") a++; } while (t > 21 && a > 0) { t -= 10; a--; } return t; }
+
+  function dealCards() {
+    function doIt() { const d = mkDeck(); const p = [d.pop(), d.pop()]; const dl = [d.pop(), d.pop()]; setDeck(d); setPlayer(p); setDealer(dl); setDReveal(false); setResult(null); setPhase("play"); if (hv(p) === 21) setTimeout(function(){ doStand(d, p, dl); }, 700); }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doIt();
+  }
+  function doHit() {
+    const d = deck.slice(); const p = player.concat([d.pop()]); setDeck(d); setPlayer(p);
+    if (hv(p) > 21) { setPhase("result"); setDReveal(true); setResult({ type: "lose", text: "BUST! -" + bet }); setChips(function(c){ return c - bet; }); }
+    else if (hv(p) === 21) doStand(d, p, dealer);
+  }
+  function doStand(d, p, dl) {
+    d = d || deck.slice(); p = p || player; dl = dl || dealer.slice();
+    setPhase("dealer"); setDReveal(true);
+    const h = dl.slice();
+    function run() {
+      if (hv(h) < 17) { setTimeout(function(){ h.push(d.pop()); setDealer(h.slice()); setDeck(d.slice()); run(); }, 500); }
+      else { setTimeout(function(){
+        const pv = hv(p), dv = hv(h), bj = p.length === 2 && pv === 21, w = bj ? Math.floor(bet * 1.5) : bet;
+        if (dv > 21) { setResult({ type: "win", text: "Dealer Busts! +" + w }); setChips(function(c){ return c + w; }); }
+        else if (pv > dv) { setResult({ type: "win", text: (bj ? "Blackjack! +" : "You Win! +") + w }); setChips(function(c){ return c + w; }); }
+        else if (pv < dv) { setResult({ type: "lose", text: "Dealer Wins -" + bet }); setChips(function(c){ return c - bet; }); }
+        else { setResult({ type: "win", text: "Push — Tie!" }); }
+        setPhase("result");
+      }, 300); }
+    } run();
+  }
+  function doDouble() {
+    const ab = Math.min(bet * 2, chips); setBet(ab);
+    const d = deck.slice(); const p = player.concat([d.pop()]); setDeck(d); setPlayer(p);
+    if (hv(p) > 21) { setPhase("result"); setDReveal(true); setResult({ type: "lose", text: "BUST! -" + ab }); setChips(function(c){ return c - ab; }); }
+    else doStand(d, p, dealer);
+  }
+
+  return <GameWrap title="🃏 Blackjack" titleColor="var(--neon)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    {phase === "bet" && <Panel style={{ textAlign: "center" }}>
+      <p style={{ color: "var(--dim)", marginBottom: 14, fontSize: 14 }}>Get close to 21 without busting!</p>
+      <BrokeBanner chips={chips} setChips={setChips} />
+      <BetSelector bet={bet} setBet={setBet} chips={chips} /><div style={{ marginTop: 16 }}><Btn onClick={dealCards} color="var(--neon)" glow>Deal Cards</Btn></div>
+    </Panel>}
+    {phase !== "bet" && <>
+      <Panel style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <span style={{ color: "var(--dim)", fontSize: 11, fontWeight: 700, letterSpacing: 1.5 }}>DEALER</span>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", color: dReveal ? "var(--text)" : "var(--dim)", fontSize: 16, fontWeight: 700 }}>{dReveal ? hv(dealer) : (dealer.length > 0 ? cardVal(dealer[0].rank) + " + ?" : "?")}</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{dealer.map(function(c, i){ return <div key={c.id} style={{ display: "inline-block" }}><PlayingCard card={c} hidden={i > 0 && !dReveal} cardDelay={i * 120} />{(i === 0 || dReveal) && <CardLabel card={c} />}</div>; })}</div>
+      </Panel>
+      <Panel style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <span style={{ color: "var(--dim)", fontSize: 11, fontWeight: 700, letterSpacing: 1.5 }}>YOUR HAND</span>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 18, fontWeight: 700, color: hv(player) > 21 ? "var(--accent)" : hv(player) === 21 ? "var(--green)" : "var(--neon2)" }}>{hv(player)}</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{player.map(function(c, i){ return <div key={c.id} style={{ display: "inline-block" }}><PlayingCard card={c} cardDelay={i * 120 + 250} /><CardLabel card={c} /></div>; })}</div>
+      </Panel>
+      {phase === "play" && <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", animation: "fadeUp 0.25s" }}>
+        <GameBtn onClick={doHit} color="var(--cool)" icon="🎯">Hit</GameBtn>
+        <GameBtn onClick={function(){ doStand(); }} color="var(--neon)" icon="✋">Stand</GameBtn>
+        {player.length === 2 && chips >= bet * 2 && <GameBtn onClick={doDouble} color="var(--neon2)" icon="⚡">Double</GameBtn>}
+      </div>}
+      {phase === "result" && result && <div style={{ animation: "fadeUp 0.25s" }}><ResultBanner text={result.text} type={result.type} show /><div style={{ textAlign: "center", marginTop: 10 }}><Btn onClick={function(){ setPhase("bet"); setResult(null); }} color="var(--neon)">Play Again</Btn></div></div>}
+    </>}
+    <GameGuide items={BJ_G} title="Blackjack Guide" />
+  </GameWrap>;
+}
+
+/* ═══ GAME 2: HIGHER/LOWER ═══════════════════════════════════════ */
+function HigherLower({ chips, setChips, onBack, safeMode, setDebtPopup }) {
+  const [phase, setPhase] = useState("bet"); const [bet, setBet] = useState(25); const [deck, setDeck] = useState([]); const [cur, setCur] = useState(null); const [nxt, setNxt] = useState(null); const [streak, setStreak] = useState(0); const [result, setResult] = useState(null); const [hist, setHist] = useState([]); const [busy, setBusy] = useState(false); const [fr, setFr] = useState(null);
+  function multi(s) { return s === 0 ? 1 : +(1 + s * 0.5).toFixed(1); }
+  function start() { function doIt() { const d = mkDeck(); setCur(d.pop()); setDeck(d); setNxt(null); setStreak(0); setResult(null); setHist([]); setFr(null); setPhase("play"); } if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return; doIt(); }
+  async function guess(higher) { if (busy) return; setBusy(true); setFr(null); const d = deck.slice(); const n = d.pop(); setDeck(d); setNxt(n); await delay(1000); const cv = cardNum(cur.rank), nv = cardNum(n.rank); const ok = higher ? nv >= cv : nv <= cv; setFr(ok ? "ok" : "no"); await delay(ok ? 700 : 1000); if (ok) { const ns = streak + 1; setStreak(ns); setHist(function(h){ return h.concat([cur]); }); setCur(n); setNxt(null); setFr(null); if (d.length < 2) doCO(ns); } else { setChips(function(c){ return c - bet; }); setResult({ type: "lose", text: "Wrong! -" + bet }); setPhase("result"); } setBusy(false); }
+  function doCO(s) { s = s || streak; const w = Math.floor(bet * multi(s)); setChips(function(c){ return c + w; }); setResult({ type: "win", text: "Cashed out! +" + w + " (" + multi(s) + "x)" }); setPhase("result"); }
+  return <GameWrap title="⬆️ Higher or Lower" titleColor="var(--cool)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    {phase === "bet" && <Panel style={{ textAlign: "center" }}><p style={{ color: "var(--dim)", marginBottom: 14, fontSize: 14 }}>Guess if the next card ranks higher or lower!</p><BrokeBanner chips={chips} setChips={setChips} /><BetSelector bet={bet} setBet={setBet} chips={chips} /><div style={{ marginTop: 16 }}><Btn onClick={start} color="var(--cool)" glow>Start</Btn></div></Panel>}
+    {phase === "play" && cur && <Panel style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}><Tag label="STREAK" value={streak} color="var(--neon2)" /><Tag label="MULTI" value={multi(streak) + "x"} color="var(--green)" /></div>
+      <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 6, alignItems: "flex-start" }}>
+        <div><div style={{ fontSize: 10, color: "var(--dim)", fontWeight: 700, marginBottom: 3 }}>CURRENT</div><PlayingCard card={cur} cardDelay={0} highlight /><CardLabel card={cur} /></div>
+        <div style={{ paddingTop: 36, color: "var(--dim)", fontSize: 20 }}>→</div>
+        <div><div style={{ fontSize: 10, color: "var(--dim)", fontWeight: 700, marginBottom: 3 }}>NEXT</div>{nxt ? <div style={{ display: "inline-block" }}><PlayingCard card={nxt} cardDelay={0} /><CardLabel card={nxt} />{fr === "ok" && <div style={{ color: "var(--green)", fontWeight: 700, fontSize: 13, marginTop: 2 }}>✓ Correct!</div>}{fr === "no" && <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: 13, marginTop: 2 }}>✗ Wrong!</div>}</div> : <div style={{ width: 70, height: 100, borderRadius: 8, border: "2px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--surface2)" }}><span style={{ color: "var(--dim)", fontSize: 24 }}>?</span></div>}</div>
+      </div>
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 14 }}>
+        <GameBtn onClick={function(){ guess(true); }} color="var(--green)" disabled={busy} icon="⬆️">Higher</GameBtn>
+        <GameBtn onClick={function(){ guess(false); }} color="var(--accent)" disabled={busy} icon="⬇️">Lower</GameBtn>
+        {streak > 0 && <GameBtn onClick={function(){ doCO(); }} color="var(--neon2)" disabled={busy} icon="💰">{"Cash Out (" + multi(streak) + "x)"}</GameBtn>}
+      </div>
+    </Panel>}
+    {phase === "result" && result && <Panel style={{ textAlign: "center" }}><ResultBanner text={result.text} type={result.type} show /><Btn onClick={function(){ setPhase("bet"); setFr(null); setNxt(null); }} color="var(--cool)">Play Again</Btn></Panel>}
+    <GameGuide items={HL_G} title="Higher/Lower Guide" />
+  </GameWrap>;
+}
+
+/* ═══ GAME 3: SLOTS ══════════════════════════════════════════════ */
+function Slots({ chips, setChips, onBack, safeMode, setDebtPopup }) {
+  const [bet, setBet] = useState(10); const [reels, setReels] = useState(["🍒","⭐","🔔"]); const [spinning, setSpinning] = useState(false); const [result, setResult] = useState(null); const [stopped, setStopped] = useState([true, true, true]);
+  async function spin() { if (spinning) return; function doIt() { doSpin(); } if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return; doSpin(); } async function doSpin() { setSpinning(true); setResult(null); setStopped([false, false, false]); const f0 = pick(SLOT_SYMS), f1 = pick(SLOT_SYMS), f2 = pick(SLOT_SYMS); const finals = [f0, f1, f2]; const ivs = []; for (let r = 0; r < 3; r++) { (function(idx){ ivs[idx] = setInterval(function(){ setReels(function(p){ const n = p.slice(); n[idx] = pick(SLOT_SYMS); return n; }); }, 65); })(r); } const times = [750, 600, 550]; for (let i = 0; i < 3; i++) { await delay(times[i]); clearInterval(ivs[i]); (function(idx){ setReels(function(p){ const n = p.slice(); n[idx] = finals[idx]; return n; }); setStopped(function(p){ const n = p.slice(); n[idx] = true; return n; }); })(i); } await delay(300); const a = finals[0], b = finals[1], c = finals[2]; let w = 0, txt = ""; if (a === b && b === c) { w = Math.floor((SLOT_PAY[a] || 10) * bet / 10); txt = "Triple! +" + w; } else if (a === b || b === c || a === c) { const m = a === b ? a : (a === c ? a : b); w = Math.floor((SLOT_PAY[m] || 5) * bet / 30); txt = "Pair! +" + w; } if (w > 0) { setChips(function(c2){ return c2 + w; }); setResult({ type: "win", text: txt }); } else { setChips(function(c2){ return c2 - bet; }); setResult({ type: "lose", text: "No match. -" + bet }); } setSpinning(false); }
+  return <GameWrap title="🎰 Lucky Slots" titleColor="var(--accent)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 20, padding: "22px 18px", background: "linear-gradient(135deg,#0f0f1a,#1a1a30)", borderRadius: 14, border: "2px solid var(--border)", boxShadow: "inset 0 3px 16px rgba(0,0,0,0.5)" }}>{reels.map(function(sym, i){ const isSt = stopped[i]; const isW = isSt && result && result.type === "win"; return <div key={i} style={{ width: 78, height: 88, borderRadius: 12, background: isSt ? "var(--surface)" : "var(--surface2)", border: isW ? "2px solid var(--neon2)" : "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 42, animation: isW ? "popBounce 0.4s" : (!isSt ? "pulse 0.12s infinite" : "reelDrop 0.25s"), boxShadow: isW ? "0 0 18px rgba(255,207,86,0.2)" : "inset 0 2px 6px rgba(0,0,0,0.3)" }}><span>{sym}</span></div>; })}</div>
+      <ResultBanner text={result ? result.text : ""} type={result ? result.type : "lose"} show={!!result && !spinning} />
+      <BrokeBanner chips={chips} setChips={setChips} />
+      <div style={{ marginBottom: 14 }}><BetSelector bet={bet} setBet={setBet} chips={chips} presets={[10, 25, 50, 100]} /></div><Btn onClick={spin} color="var(--accent)" disabled={spinning} glow>{spinning ? "Spinning..." : "🎰 SPIN"}</Btn>
+    </Panel>
+    <GameGuide items={SL_G} title="Slots Guide" />
+  </GameWrap>;
+}
+
+/* ═══ GAME 4: COIN LADDER ════════════════════════════════════════ */
+function CoinLadder({ chips, setChips, onBack, safeMode, setDebtPopup }) {
+  const [phase, setPhase] = useState("bet"); const [bet, setBet] = useState(25); const [rung, setRung] = useState(0); const [busy, setBusy] = useState(false); const [result, setResult] = useState(null); const [coinSide, setCoinSide] = useState(null); const [coinAnim, setCoinAnim] = useState(false); const [fr, setFr] = useState(null);
+  const LADDER = [{m:1.5,l:"1.5x"},{m:2,l:"2x"},{m:3,l:"3x"},{m:5,l:"5x"},{m:8,l:"8x"},{m:15,l:"15x"},{m:25,l:"25x"},{m:50,l:"50x"}];
+  async function flip(choice) { if (busy) return; setBusy(true); setFr(null); setCoinSide(null); setCoinAnim(true); await delay(1400); const actual = Math.random() < 0.5 ? "heads" : "tails"; setCoinAnim(false); setCoinSide(actual); await delay(900); const ok = choice === actual; setFr(ok ? "ok" : "no"); await delay(1100); if (ok) { const nr = rung + 1; setRung(nr); setFr(null); setCoinSide(null); if (nr >= LADDER.length) doCO(nr); } else { setChips(function(c){ return c - bet; }); setResult({ type: "lose", text: "It was " + (actual === "heads" ? "Heads" : "Tails") + "! -" + bet }); setPhase("result"); } setBusy(false); }
+  function doCO(r) { r = r || rung; const w = Math.floor(bet * LADDER[r - 1].m); setChips(function(c){ return c + w; }); setResult({ type: "win", text: "Cashed out at " + LADDER[r - 1].l + "! +" + w }); setPhase("result"); }
+  return <GameWrap title="🪙 Coin Ladder" titleColor="var(--neon2)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    {phase === "bet" && <Panel style={{ textAlign: "center" }}><p style={{ color: "var(--dim)", marginBottom: 14, fontSize: 14 }}>Guess heads or tails to climb!</p><BrokeBanner chips={chips} setChips={setChips} /><BetSelector bet={bet} setBet={setBet} chips={chips} /><div style={{ marginTop: 16 }}><Btn onClick={function(){ function doIt(){ setRung(0); setResult(null); setCoinSide(null); setFr(null); setPhase("play"); } if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return; doIt(); }} color="var(--neon2)" glow>Start Climbing</Btn></div></Panel>}
+    {phase === "play" && <Panel style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column-reverse", gap: 4, maxWidth: 240, margin: "0 auto 14px" }}>{LADDER.map(function(step, i){ const done = i < rung; const act = i === rung; return <div key={i} style={{ padding: "7px 12px", borderRadius: 9, background: done ? "linear-gradient(135deg,var(--green),#059669)" : act ? "var(--surface2)" : "var(--surface)", border: act ? "2px solid var(--neon2)" : done ? "1px solid var(--green)" : "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", animation: act ? "popBounce 0.3s" : "none" }}><span style={{ fontSize: 11, color: done ? "#fff" : act ? "var(--neon2)" : "var(--dim)", fontWeight: 700 }}>{(done ? "✓" : act ? "→" : "") + " Rung " + (i + 1)}</span><span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700, color: done ? "#fff" : act ? "var(--neon2)" : "var(--dim)" }}>{step.l}</span></div>; })}</div>
+      <div style={{ width: 80, height: 80, borderRadius: "50%", margin: "0 auto 6px", background: coinSide === "heads" ? "linear-gradient(135deg,#fbbf24,#f59e0b)" : coinSide === "tails" ? "linear-gradient(135deg,#374151,#1f2937)" : "linear-gradient(135deg,#6366f1,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 38, border: "3px solid var(--border)", animation: coinAnim ? "coinSpin 0.28s linear infinite" : "none" }}>{coinAnim ? "🪙" : coinSide === "heads" ? "🌕" : coinSide === "tails" ? "🌑" : "🪙"}</div>
+      {coinSide && !coinAnim && <div style={{ animation: "fadeUp 0.2s", marginBottom: 4 }}><div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{coinSide === "heads" ? "🌕 HEADS" : "🌑 TAILS"}</div>{fr === "ok" && <div style={{ color: "var(--green)", fontWeight: 700 }}>✓ Correct!</div>}{fr === "no" && <div style={{ color: "var(--accent)", fontWeight: 700 }}>✗ Wrong!</div>}</div>}
+      <div style={{ height: 8 }} />
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+        <GameBtn onClick={function(){ flip("heads"); }} color="var(--neon2)" disabled={busy} icon="🌕">Heads</GameBtn>
+        <GameBtn onClick={function(){ flip("tails"); }} color="var(--cool)" disabled={busy} icon="🌑">Tails</GameBtn>
+        {rung > 0 && <GameBtn onClick={function(){ doCO(); }} color="var(--green)" disabled={busy} icon="💰">{"Cash Out (" + LADDER[rung - 1].l + ")"}</GameBtn>}
+      </div>
+    </Panel>}
+    {phase === "result" && result && <Panel style={{ textAlign: "center" }}><ResultBanner text={result.text} type={result.type} show /><Btn onClick={function(){ setPhase("bet"); }} color="var(--neon2)">Play Again</Btn></Panel>}
+    <GameGuide items={CL_G} title="Coin Ladder Guide" />
+  </GameWrap>;
+}
+
+/* ═══ GAME 5: MEMORY ═════════════════════════════════════════════ */
+function MemoryMatch({ chips, setChips, onBack, safeMode, setDebtPopup }) {
+  const EMOJIS = ["🎭","🦊","🌸","⚡","🎲","🔮","🦋","🌊"];
+  const [phase, setPhase] = useState("bet"); const [bet, setBet] = useState(25); const [board, setBoard] = useState([]); const [flipped, setFlipped] = useState([]); const [matched, setMatched] = useState([]); const [moves, setMoves] = useState(0); const [canFlip, setCanFlip] = useState(true); const [result, setResult] = useState(null); const [wrongs, setWrongs] = useState(0);
+  const MAX = 20, PEN = 5;
+  function startGame() { const pairs = EMOJIS.concat(EMOJIS).map(function(e){ return { emoji: e, id: uid() }; }); for (let i = pairs.length - 1; i > 0; i--) { const j = rand(0, i); [pairs[i], pairs[j]] = [pairs[j], pairs[i]]; } setBoard(pairs); setFlipped([]); setMatched([]); setMoves(0); setResult(null); setCanFlip(true); setWrongs(0); if (!safeMode) setChips(function(c){ return c - bet; }); setPhase("play"); }
+  function handleStart() { if (safeMode) { startGame(); return; } if (checkDebt(bet, chips, setBet, setDebtPopup, startGame)) return; startGame(); }
+  async function flipCard(idx) { if (!canFlip || flipped.indexOf(idx) >= 0 || matched.indexOf(idx) >= 0) return; const nf = flipped.concat([idx]); setFlipped(nf); if (nf.length === 2) { setCanFlip(false); const nm2 = moves + 1; setMoves(nm2); if (board[nf[0]].emoji === board[nf[1]].emoji) { await delay(400); const nm = matched.concat([nf[0], nf[1]]); setMatched(nm); setFlipped([]); setCanFlip(true); if (nm.length === board.length) { const bonus = Math.max(0, MAX - nm2); const w = Math.floor(bet * (1.5 + bonus * 0.15)); if (!safeMode) setChips(function(c){ return c + w; }); setResult({ type: "win", text: safeMode ? "All matched! Great job!" : "All matched! +" + w }); setPhase("result"); } } else { setWrongs(function(w2){ return w2 + 1; }); if (!safeMode) setChips(function(c){ return c - PEN; }); await delay(800); setFlipped([]); setCanFlip(true); if (nm2 >= MAX) { setResult({ type: "lose", text: "Out of moves!" }); setPhase("result"); } } } }
+  return <GameWrap title="🧠 Memory Match" titleColor="var(--green)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    {phase === "bet" && <Panel style={{ textAlign: "center" }}><p style={{ color: "var(--dim)", marginBottom: 14, fontSize: 14 }}>Match pairs before moves run out!</p>{!safeMode && <BrokeBanner chips={chips} setChips={setChips} />}{!safeMode && <BetSelector bet={bet} setBet={setBet} chips={chips} />}<div style={{ marginTop: 16 }}><Btn onClick={handleStart} color="var(--green)" glow>{safeMode ? "Play Free" : "Start"}</Btn></div></Panel>}
+    {phase === "play" && <Panel>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 6 }}><Tag label="MOVES" value={moves + "/" + MAX} color={moves > MAX - 4 ? "var(--accent)" : "var(--text)"} /><Tag label="MATCHED" value={matched.length / 2 + "/" + EMOJIS.length} color="var(--green)" />{!safeMode && <Tag label="PENALTY" value={"-" + wrongs * PEN} color={wrongs > 0 ? "var(--accent)" : "var(--dim)"} />}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 7, maxWidth: 320, margin: "0 auto" }}>{board.map(function(card, i){ const isF = flipped.indexOf(i) >= 0; const isM = matched.indexOf(i) >= 0; const sh = isF || isM; return <div key={card.id} onClick={function(){ flipCard(i); }} style={{ aspectRatio: "1", borderRadius: 10, background: isM ? "linear-gradient(135deg,rgba(74,222,128,0.15),rgba(74,222,128,0.05))" : isF ? "var(--surface2)" : "linear-gradient(135deg,#1a1a3e,#2d1b4e)", border: isM ? "2px solid rgba(74,222,128,0.3)" : isF ? "2px solid var(--neon)" : "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", cursor: sh || !canFlip ? "default" : "pointer", fontSize: "clamp(18px,5vw,28px)", transition: "all 0.25s cubic-bezier(0.34,1.56,0.64,1)", opacity: isM ? 0.5 : 1 }}>{sh ? card.emoji : <span style={{ opacity: 0.2 }}>?</span>}</div>; })}</div>
+    </Panel>}
+    {phase === "result" && result && <Panel style={{ textAlign: "center" }}><ResultBanner text={result.text} type={result.type} show /><Btn onClick={function(){ setPhase("bet"); }} color="var(--green)">Play Again</Btn></Panel>}
+    <GameGuide items={MM_G} title="Memory Guide" />
+  </GameWrap>;
+}
+
+/* ═══ GAME 6: MINES ══════════════════════════════════════════════ */
+function Mines({ chips, setChips, onBack, safeMode, setDebtPopup }) {
+  const [phase, setPhase] = useState("bet"); const [bet, setBet] = useState(25); const [mineCount, setMineCount] = useState(5); const [grid, setGrid] = useState([]); const [revealed, setRevealed] = useState([]); const [minePos, setMinePos] = useState([]); const [result, setResult] = useState(null); const [safe, setSafe] = useState(0);
+  function gM(mines, s) { if (s <= 0) return 1; let m = 1; for (let i = 0; i < s; i++) { const den = 25 - mines - i; if (den <= 0) break; m = m * (25 / den); } return Math.max(1, +(m * 0.97).toFixed(2)); }
+  function startGame() { const pos = []; while (pos.length < mineCount) { const v = rand(0, 24); if (pos.indexOf(v) === -1) pos.push(v); } const g = []; for (let i = 0; i < 25; i++) g.push(pos.indexOf(i) >= 0 ? "mine" : "safe"); setGrid(g); setMinePos(pos); setRevealed([]); setSafe(0); setResult(null); setChips(function(c){ return c - bet; }); setPhase("play"); }
+  function click(idx) { if (phase !== "play" || revealed.indexOf(idx) >= 0) return; const nr = revealed.concat([idx]); setRevealed(nr); if (grid[idx] === "mine") { const all = nr.slice(); for (let i = 0; i < minePos.length; i++) { if (all.indexOf(minePos[i]) === -1) all.push(minePos[i]); } setRevealed(all); setResult({ type: "lose", text: "BOOM! -" + bet }); setPhase("result"); } else { const ns = safe + 1; setSafe(ns); if (ns >= 25 - mineCount) doCO(ns); } }
+  function doCO(s) { s = s || safe; const m = gM(mineCount, s); const w = Math.floor(bet * m); setChips(function(c){ return c + w; }); const all = revealed.slice(); for (let i = 0; i < minePos.length; i++) { if (all.indexOf(minePos[i]) === -1) all.push(minePos[i]); } setRevealed(all); setResult({ type: "win", text: m + "x = +" + w }); setPhase("result"); }
+  const cm = gM(mineCount, safe), nm = gM(mineCount, safe + 1);
+  return <GameWrap title="💣 Mines" titleColor="#e74c3c" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    {phase === "bet" && <Panel style={{ textAlign: "center" }}><p style={{ color: "var(--dim)", marginBottom: 14, fontSize: 14 }}>Reveal safe tiles. Hit a mine and lose!</p><BrokeBanner chips={chips} setChips={setChips} /><BetSelector bet={bet} setBet={setBet} chips={chips} /><div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}><span style={{ color: "var(--dim)", fontSize: 12, fontWeight: 600 }}>MINES:</span>{[3, 5, 10].map(function(n){ return <button key={n} onClick={function(){ setMineCount(n); }} style={{ padding: "5px 14px", borderRadius: 7, fontSize: 13, fontWeight: 700, background: mineCount === n ? "#e74c3c" : "var(--surface2)", color: mineCount === n ? "#fff" : "var(--dim)", border: mineCount === n ? "2px solid #e74c3c" : "1px solid var(--border)", fontFamily: "'JetBrains Mono',monospace" }}>{n}</button>; })}</div><div style={{ marginTop: 16 }}><Btn onClick={function(){ if (checkDebt(bet, chips, setBet, setDebtPopup, startGame)) return; startGame(); }} color="#e74c3c" glow>Start Game</Btn></div></Panel>}
+    {(phase === "play" || phase === "result") && grid.length === 25 && <Panel>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 6 }}><Tag label="SAFE" value={safe} color="var(--green)" /><Tag label="MULTI" value={cm + "x"} color="var(--neon2)" /><Tag label="NEXT" value={nm + "x"} color="var(--cool)" /></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 6, maxWidth: 320, margin: "0 auto" }}>{grid.map(function(cell, i){ const isR = revealed.indexOf(i) >= 0; const isM = cell === "mine"; return <div key={i} onClick={function(){ click(i); }} style={{ aspectRatio: "1", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isR ? 22 : 16, cursor: (isR || phase === "result") ? "default" : "pointer", background: isR ? (isM ? "linear-gradient(135deg,rgba(231,76,60,0.2),rgba(192,57,43,0.1))" : "linear-gradient(135deg,rgba(74,222,128,0.15),rgba(74,222,128,0.05))") : "linear-gradient(135deg,#1e1e3a,#2a1a40)", border: isR ? (isM ? "2px solid rgba(231,76,60,0.4)" : "2px solid rgba(74,222,128,0.3)") : "2px solid var(--border)", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)" }}>{isR ? (isM ? "💣" : "💎") : <span style={{ opacity: 0.15 }}>·</span>}</div>; })}</div>
+      {phase === "play" && safe > 0 && <div style={{ textAlign: "center", marginTop: 14 }}><GameBtn onClick={function(){ doCO(); }} color="var(--green)" icon="💰">{"Cash Out (" + cm + "x = " + Math.floor(bet * cm) + ")"}</GameBtn></div>}
+      {phase === "result" && result && <div style={{ marginTop: 12 }}><ResultBanner text={result.text} type={result.type} show /><div style={{ textAlign: "center" }}><Btn onClick={function(){ setPhase("bet"); }} color="#e74c3c">Play Again</Btn></div></div>}
+    </Panel>}
+    <GameGuide items={MI_G} title="Mines Guide" />
+  </GameWrap>;
+}
+
+/* ═══ GAME 7: PLINKO (Canvas Physics) ════════════════════════════ */
+function Plinko({ chips, setChips, onBack, safeMode, setDebtPopup }) {
+  const [bet, setBet] = useState(10); const [risk, setRisk] = useState("medium"); const [result, setResult] = useState(null); const [dropping, setDropping] = useState(false); const [landedSlot, setLandedSlot] = useState(-1);
+  const canvasRef = useRef(null);
+  const ROWS = 12; const SLOTS = ROWS + 1;
+  const MULTS = { low: [5,2,1.5,1.2,1,0.5,0.3,0.5,1,1.2,1.5,2,5], medium: [25,8,3,2,1.5,0.5,0.3,0.5,1.5,2,3,8,25], high: [110,25,10,5,3,1,0,1,3,5,10,25,110] };
+  const RC = { low: "#56c1ff", medium: "#ffcf56", high: "#ff5e78" };
+
+  function getPeg(row, col, W, H) {
+    const px = 28, pt = 22, pb = 38; const bH = H - pt - pb; const bW = W - px * 2;
+    const pC = row + 2; const rY = pt + (row + 1) * (bH / (ROWS + 1));
+    const pX = px + bW / 2 - (pC - 1) * (bW / (ROWS + 1)) / 2 + col * (bW / (ROWS + 1));
+    return { x: pX, y: rY };
+  }
+
+  function drawBoard(ctx, W, H, bx, by, hitRow) {
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#0d0d1a"; ctx.fillRect(0, 0, W, H);
+    for (let row = 0; row < ROWS; row++) {
+      const pC = row + 2;
+      for (let col = 0; col < pC; col++) {
+        const p = getPeg(row, col, W, H);
+        ctx.beginPath(); ctx.arc(p.x, p.y, row === hitRow ? 4 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = row === hitRow ? RC[risk] : "#3a3a5a"; ctx.fill();
+        if (row === hitRow) { ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2); ctx.fillStyle = RC[risk]; ctx.fill(); ctx.globalAlpha = 1; }
+      }
+    }
+    if (bx >= 0 && by >= 0) {
+      ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI * 2); ctx.fillStyle = RC[risk]; ctx.fill();
+      ctx.globalAlpha = 0.15; ctx.beginPath(); ctx.arc(bx, by, 13, 0, Math.PI * 2); ctx.fillStyle = RC[risk]; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.arc(bx, by, 3.5, 0, Math.PI * 2); ctx.fillStyle = "#ffffffaa"; ctx.fill();
+    }
+  }
+
+  useEffect(function() {
+    const c = canvasRef.current; if (!c) return;
+    drawBoard(c.getContext("2d"), c.width, c.height, -1, -1, -1);
+  }, [risk]);
+
+  async function dropBall() {
+    if (dropping) return;
+    if (bet > chips) { if (checkDebt(bet, chips, setBet, setDebtPopup, dropBall)) return; }
+    setDropping(true); setResult(null); setLandedSlot(-1);
+    const c = canvasRef.current; if (!c) { setDropping(false); return; }
+    const ctx = c.getContext("2d"); const W = c.width; const H = c.height;
+    let col = 0; const path = [];
+    for (let row = 0; row < ROWS; row++) { col += Math.random() < 0.5 ? 0 : 1; path.push({ row, col }); }
+    const finalSlot = col;
+    let bx = W / 2, by = 8;
+    for (let i = 0; i < path.length; i++) {
+      const peg = getPeg(path[i].row, path[i].col, W, H);
+      const tx = peg.x, ty = peg.y - 10; const dx = tx - bx, dy = ty - by;
+      for (let s = 0; s < 18; s++) {
+        const t = (s + 1) / 18; const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const bounce = Math.sin(t * Math.PI) * (dx > 0 ? 3 : -3);
+        drawBoard(ctx, W, H, bx + dx * e + bounce * (1 - t), by + dy * (t * t), path[i].row);
+        await delay(11);
+      }
+      bx = tx; by = ty;
+    }
+    const endY = H - 33; const slotX = getPeg(ROWS - 1, finalSlot, W, H).x;
+    for (let s = 0; s < 12; s++) { const t = (s + 1) / 12; drawBoard(ctx, W, H, slotX, by + (endY - by) * (t * t), -1); await delay(14); }
+    drawBoard(ctx, W, H, slotX, endY, -1); setLandedSlot(finalSlot); await delay(300);
+    const mult = MULTS[risk][finalSlot] !== undefined ? MULTS[risk][finalSlot] : 0;
+    const profit = Math.floor(bet * mult) - bet;
+    if (profit > 0) { setChips(function(c2){ return c2 + profit; }); setResult({ type: "win", text: mult + "x = +" + profit + " profit!" }); }
+    else if (profit < 0) { setChips(function(c2){ return c2 + profit; }); setResult({ type: "lose", text: mult + "x = " + profit }); }
+    else { setResult({ type: "win", text: mult + "x = Even!" }); }
+    setDropping(false);
+  }
+
+  return <GameWrap title="📍 Plinko" titleColor="var(--neon2)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      <canvas ref={canvasRef} width={360} height={380} style={{ width: "100%", maxWidth: 360, height: "auto", borderRadius: 12, marginBottom: 12 }} />
+      <div style={{ display: "flex", gap: 2, marginBottom: 12, justifyContent: "center" }}>{MULTS[risk].map(function(mult, i){ const isHit = landedSlot === i && !dropping; return <div key={i} style={{ flex: 1, maxWidth: 30, padding: "5px 1px", borderRadius: 6, textAlign: "center", fontSize: 9, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", background: isHit ? (RC[risk] + "33") : (mult >= 5 ? "rgba(255,94,120,0.15)" : mult >= 2 ? "rgba(255,207,86,0.1)" : "rgba(86,193,255,0.08)"), color: isHit ? RC[risk] : (mult >= 5 ? "var(--accent)" : mult >= 2 ? "var(--neon2)" : "var(--cool)"), border: isHit ? ("2px solid " + RC[risk]) : "1px solid var(--border)", animation: isHit ? "popBounce 0.4s" : "none" }}>{mult + "x"}</div>; })}</div>
+      <ResultBanner text={result ? result.text : ""} type={result ? result.type : "lose"} show={!!result && !dropping} />
+      <BrokeBanner chips={chips} setChips={setChips} />
+      <BetSelector bet={bet} setBet={setBet} chips={chips} presets={[10, 25, 50, 100]} />
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}><span style={{ color: "var(--dim)", fontSize: 12, fontWeight: 600 }}>RISK:</span>{["low", "medium", "high"].map(function(r){ return <button key={r} onClick={function(){ setRisk(r); }} style={{ padding: "5px 14px", borderRadius: 7, fontSize: 12, fontWeight: 700, background: risk === r ? RC[r] : "var(--surface2)", color: risk === r ? "#000" : "var(--dim)", border: risk === r ? "2px solid " + RC[r] : "1px solid var(--border)", fontFamily: "'JetBrains Mono',monospace", textTransform: "capitalize" }}>{r}</button>; })}</div>
+        <div style={{ marginTop: 14 }}><Btn onClick={dropBall} color={RC[risk]} disabled={dropping} glow>{dropping ? "Dropping..." : "📍 Drop Ball"}</Btn></div>
+    </Panel>
+    <GameGuide items={PL_G} title="Plinko Guide" />
+  </GameWrap>;
+}
+
+/* ═══ GAME 8: LIMBO (Dynamic Odds) ═══════════════════════════════ */
+function Limbo({ chips, setChips, onBack, safeMode, setDebtPopup }) {
+  const [bet, setBet] = useState(25); const [target, setTarget] = useState(2); const [result, setResult] = useState(null); const [rolling, setRolling] = useState(false); const [rollNum, setRollNum] = useState(null); const [animNum, setAnimNum] = useState(null); const [penalty, setPenalty] = useState(0);
+  const prevTarget = useRef(target);
+  useEffect(function() { if (target !== prevTarget.current) { setPenalty(0); prevTarget.current = target; } }, [target]);
+  function baseChance(t) { return Math.min(99, Math.max(1, Math.floor(100 / t))); }
+  function actualChance(t) { return Math.max(5, baseChance(t) - penalty); }
+  async function doRoll() { if (rolling) return; if (bet > chips) { if (checkDebt(bet, chips, setBet, setDebtPopup, doRoll)) return; } setRolling(true); setResult(null); setRollNum(null); for (let i = 0; i < 12; i++) { setAnimNum(+(Math.random() * 100).toFixed(2)); await delay(80); } const chance = actualChance(target) / 100; let outcome; if (Math.random() < chance) { outcome = +(target + Math.random() * (100 - target)).toFixed(2); } else { outcome = +(1 + Math.random() * Math.max(0.01, target - 1.01)).toFixed(2); } setAnimNum(null); setRollNum(outcome); await delay(400); if (outcome >= target) { const profit = Math.floor(bet * target) - bet; setChips(function(c){ return c + profit; }); setResult({ type: "win", text: outcome.toFixed(2) + "x >= " + target + "x = +" + profit }); } else { setChips(function(c){ return c - bet; }); setResult({ type: "lose", text: outcome.toFixed(2) + "x < " + target + "x = -" + bet }); } setPenalty(function(p){ return Math.min(30, p + 1); }); setRolling(false); }
+  const TARGETS = [1.2, 1.5, 2, 3, 5, 10, 25, 50, 100];
+  let displayNum = "—"; if (animNum !== null) displayNum = animNum.toFixed(2) + "x"; else if (rollNum !== null) displayNum = rollNum.toFixed(2) + "x";
+  let numColor = "var(--dim)"; if (rollNum !== null && animNum === null) numColor = rollNum >= target ? "var(--green)" : "var(--accent)";
+  const ac = actualChance(target), bc = baseChance(target);
+  return <GameWrap title="🚀 Limbo" titleColor="#8b5cf6" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      <div style={{ margin: "8px 0 20px", padding: "24px 16px", background: "linear-gradient(135deg,#0f0f1a,#1a1a30)", borderRadius: 16, border: "1px solid var(--border)" }}>
+        <div style={{ fontSize: 48, fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: numColor, transition: "color 0.3s" }}>{displayNum}</div>
+        <div style={{ fontSize: 13, color: "var(--dim)", marginTop: 6 }}>Target: <span style={{ color: "#8b5cf6", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" }}>{target + "x"}</span> · Win: <span style={{ color: ac < bc ? "var(--accent)" : "var(--neon2)", fontWeight: 700 }}>{ac + "%"}</span>{ac < bc && <span style={{ color: "var(--accent)", fontSize: 10, marginLeft: 4 }}>(-{penalty}%)</span>}</div>
+      </div>
+      <ResultBanner text={result ? result.text : ""} type={result ? result.type : "lose"} show={!!result && !rolling} />
+      <BrokeBanner chips={chips} setChips={setChips} />
+      <BetSelector bet={bet} setBet={setBet} chips={chips} />
+        <div style={{ marginTop: 12 }}><span style={{ color: "var(--dim)", fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6 }}>TARGET MULTIPLIER:</span><div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "center" }}>{TARGETS.map(function(t){ return <button key={t} onClick={function(){ setTarget(t); }} style={{ padding: "5px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, background: target === t ? "#8b5cf6" : "var(--surface2)", color: target === t ? "#fff" : "var(--dim)", border: target === t ? "2px solid #8b5cf6" : "1px solid var(--border)", fontFamily: "'JetBrains Mono',monospace" }}>{t + "x"}</button>; })}</div></div>
+        <div style={{ marginTop: 16 }}><Btn onClick={doRoll} color="#8b5cf6" disabled={rolling} glow>{rolling ? "Rolling..." : "🚀 Roll"}</Btn></div>
+    </Panel>
+    <GameGuide items={LI_G} title="Limbo Guide" />
+  </GameWrap>;
+}
+
+/* ═══════════ HUB ════════════════════════════════════════════════ */
+/* ═══ SAFE GAME 1: REACTION TEST ═════════════════════════════════ */
+function ReactionTest({ chips, setChips, onBack, safeMode }) {
+  const [phase, setPhase] = useState("ready"); // ready, wait, go, result
+  const [bestTime, setBestTime] = useState(null);
+  const [thisTime, setThisTime] = useState(null);
+  const [attempts, setAttempts] = useState(0);
+  const startRef = useRef(0);
+  const timerRef = useRef(null);
+
+  function startRound() {
+    setPhase("wait"); setThisTime(null);
+    const waitMs = 1500 + Math.random() * 3500;
+    timerRef.current = setTimeout(function() { setPhase("go"); startRef.current = performance.now(); }, waitMs);
+  }
+  function clicked() {
+    if (phase === "wait") { clearTimeout(timerRef.current); setPhase("ready"); setThisTime("Too early!"); return; }
+    if (phase === "go") {
+      const ms = Math.round(performance.now() - startRef.current);
+      setThisTime(ms); setAttempts(function(a){ return a + 1; });
+      if (bestTime === null || ms < bestTime) setBestTime(ms);
+      setPhase("result");
+    }
+  }
+  useEffect(function() { return function() { clearTimeout(timerRef.current); }; }, []);
+
+  const bgColor = phase === "wait" ? "#c0392b" : phase === "go" ? "#27ae60" : "var(--surface)";
+  return <GameWrap title="⚡ Reaction Test" titleColor="var(--neon2)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+        <Tag label="BEST" value={bestTime !== null ? bestTime + "ms" : "—"} color="var(--green)" />
+        <Tag label="ATTEMPTS" value={attempts} color="var(--cool)" />
+      </div>
+      <div onClick={clicked} style={{ padding: "60px 20px", borderRadius: 16, background: bgColor, cursor: "pointer", transition: "background 0.15s", marginBottom: 14, userSelect: "none" }}>
+        {phase === "ready" && <div><div style={{ fontSize: 36, marginBottom: 8 }}>⚡</div><div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>Click Start, then wait...</div></div>}
+        {phase === "wait" && <div><div style={{ fontSize: 36, marginBottom: 8 }}>🔴</div><div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>Wait for green...</div><div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 4 }}>Don't click yet!</div></div>}
+        {phase === "go" && <div><div style={{ fontSize: 36, marginBottom: 8 }}>🟢</div><div style={{ fontSize: 22, fontWeight: 900, color: "#fff" }}>CLICK NOW!</div></div>}
+        {phase === "result" && <div><div style={{ fontSize: 36, marginBottom: 8 }}>{thisTime < 250 ? "🔥" : thisTime < 400 ? "⚡" : "👍"}</div><div style={{ fontSize: 32, fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: thisTime < 250 ? "var(--green)" : thisTime < 400 ? "var(--neon2)" : "var(--cool)" }}>{thisTime}ms</div><div style={{ fontSize: 13, color: "var(--dim)", marginTop: 6 }}>{thisTime < 200 ? "Insane!" : thisTime < 250 ? "Amazing!" : thisTime < 350 ? "Great!" : thisTime < 500 ? "Good" : "Keep practicing!"}</div></div>}
+      </div>
+      {typeof thisTime === "string" && <div style={{ color: "var(--accent)", fontWeight: 700, marginBottom: 10 }}>{thisTime}</div>}
+      {(phase === "ready" || phase === "result") && <Btn onClick={startRound} color="var(--neon2)" glow>{phase === "ready" ? "Start" : "Try Again"}</Btn>}
+    </Panel>
+  </GameWrap>;
+}
+
+/* ═══ SAFE GAME 2: COLOR MATCH ═══════════════════════════════════ */
+function ColorMatchGame({ chips, setChips, onBack, safeMode }) {
+  const COLORS = [{name:"Red",hex:"#e74c3c"},{name:"Blue",hex:"#3498db"},{name:"Green",hex:"#27ae60"},{name:"Yellow",hex:"#f1c40f"},{name:"Purple",hex:"#9b59b6"},{name:"Orange",hex:"#e67e22"}];
+  const [score, setScore] = useState(0); const [best, setBest] = useState(0); const [round, setRound] = useState(0); const [word, setWord] = useState(null); const [displayColor, setDisplayColor] = useState(null); const [options, setOptions] = useState([]); const [feedback, setFeedback] = useState(null); const [timeLeft, setTimeLeft] = useState(15); const [active, setActive] = useState(false);
+  const timerRef = useRef(null);
+  function genRound() {
+    const w = COLORS[Math.floor(Math.random() * COLORS.length)];
+    let dc = COLORS[Math.floor(Math.random() * COLORS.length)];
+    while (dc.name === w.name) dc = COLORS[Math.floor(Math.random() * COLORS.length)];
+    const correct = dc; // answer is the DISPLAY color, not the word
+    const opts = [correct]; while (opts.length < 3) { const o = COLORS[Math.floor(Math.random() * COLORS.length)]; let dup = false; for (let j = 0; j < opts.length; j++) if (opts[j].name === o.name) dup = true; if (!dup) opts.push(o); }
+    for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = opts[i]; opts[i] = opts[j]; opts[j] = t; }
+    setWord(w); setDisplayColor(dc); setOptions(opts); setFeedback(null);
+  }
+  function startGame() { setScore(0); setRound(0); setTimeLeft(15); setActive(true); genRound(); }
+  function answer(c) { if (!active || feedback) return; if (c.name === displayColor.name) { const ns = score + 1; setScore(ns); if (ns > best) setBest(ns); setFeedback("ok"); } else { setFeedback("no"); } setTimeout(function(){ setRound(function(r){ return r + 1; }); genRound(); }, 500); }
+  useEffect(function() { if (!active) return; timerRef.current = setInterval(function(){ setTimeLeft(function(t){ if (t <= 1) { setActive(false); clearInterval(timerRef.current); return 0; } return t - 1; }); }, 1000); return function(){ clearInterval(timerRef.current); }; }, [active]);
+
+  return <GameWrap title="🎨 Color Match" titleColor="#9b59b6" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      {!active && timeLeft === 15 && <><p style={{ color: "var(--dim)", fontSize: 14, marginBottom: 14 }}>Pick the COLOR the word is displayed in, not what it says!</p><Btn onClick={startGame} color="#9b59b6" glow>Start Game</Btn></>}
+      {!active && timeLeft === 0 && <><div style={{ fontSize: 32, marginBottom: 8 }}>⏰</div><div style={{ fontSize: 22, fontWeight: 900, color: "var(--neon2)", fontFamily: "'JetBrains Mono',monospace" }}>{score} points</div><p style={{ color: "var(--dim)", fontSize: 13, marginTop: 6 }}>Best: {best}</p><div style={{ marginTop: 14 }}><Btn onClick={function(){ setTimeLeft(15); startGame(); }} color="#9b59b6" glow>Play Again</Btn></div></>}
+      {active && word && <><div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 14 }}><Tag label="SCORE" value={score} color="var(--green)" /><Tag label="TIME" value={timeLeft + "s"} color={timeLeft <= 5 ? "var(--accent)" : "var(--cool)"} /></div>
+        <div style={{ fontSize: 42, fontWeight: 900, fontFamily: "'Playfair Display',serif", color: displayColor.hex, marginBottom: 20, textShadow: "0 0 12px " + displayColor.hex + "44" }}>{word.name}</div>
+        <p style={{ fontSize: 12, color: "var(--dim)", marginBottom: 12 }}>What COLOR is this text displayed in?</p>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>{options.map(function(c){ return <button key={c.name} onClick={function(){ answer(c); }} style={{ padding: "10px 22px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: feedback === "ok" && c.name === displayColor.name ? "var(--green)" : feedback === "no" && c.name === displayColor.name ? "var(--green)" : "var(--surface2)", color: c.hex, border: "2px solid " + c.hex + "44" }}>{c.name}</button>; })}</div>
+        {feedback === "ok" && <div style={{ color: "var(--green)", fontWeight: 700, marginTop: 8, animation: "fadeUp 0.2s" }}>✓ Correct!</div>}
+        {feedback === "no" && <div style={{ color: "var(--accent)", fontWeight: 700, marginTop: 8, animation: "shake 0.3s" }}>✗ Wrong!</div>}
+      </>}
+    </Panel>
+  </GameWrap>;
+}
+
+/* ═══ SAFE GAME 3: MATH RUSH ════════════════════════════════════ */
+function MathRush({ chips, setChips, onBack, safeMode }) {
+  const [score, setScore] = useState(0); const [best, setBest] = useState(0); const [problem, setProblem] = useState(null); const [choices, setChoices] = useState([]); const [feedback, setFeedback] = useState(null); const [timeLeft, setTimeLeft] = useState(20); const [active, setActive] = useState(false);
+  const timerRef = useRef(null);
+  function genProblem() {
+    const ops = ["+", "−", "×"];
+    const op = ops[Math.floor(Math.random() * ops.length)];
+    let a, b, answer;
+    if (op === "+") { a = rand(2, 50); b = rand(2, 50); answer = a + b; }
+    else if (op === "−") { a = rand(10, 60); b = rand(2, a); answer = a - b; }
+    else { a = rand(2, 12); b = rand(2, 12); answer = a * b; }
+    setProblem(a + " " + op + " " + b);
+    const opts = [answer]; while (opts.length < 4) { const wrong = answer + rand(-10, 10); if (wrong !== answer && opts.indexOf(wrong) === -1 && wrong >= 0) opts.push(wrong); }
+    for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = opts[i]; opts[i] = opts[j]; opts[j] = t; }
+    setChoices(opts.map(function(v){ return { val: v, correct: v === answer }; }));
+    setFeedback(null);
+  }
+  function startGame() { setScore(0); setTimeLeft(20); setActive(true); genProblem(); }
+  function pick2(c) { if (!active || feedback) return; if (c.correct) { const ns = score + 1; setScore(ns); if (ns > best) setBest(ns); setFeedback("ok"); } else { setFeedback("no"); } setTimeout(genProblem, 400); }
+  useEffect(function() { if (!active) return; timerRef.current = setInterval(function(){ setTimeLeft(function(t){ if (t <= 1) { setActive(false); clearInterval(timerRef.current); return 0; } return t - 1; }); }, 1000); return function(){ clearInterval(timerRef.current); }; }, [active]);
+
+  return <GameWrap title="🧮 Math Rush" titleColor="var(--cool)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      {!active && timeLeft === 20 && <><p style={{ color: "var(--dim)", fontSize: 14, marginBottom: 14 }}>Solve as many math problems as you can!</p><Btn onClick={startGame} color="var(--cool)" glow>Start</Btn></>}
+      {!active && timeLeft === 0 && <><div style={{ fontSize: 32, marginBottom: 8 }}>🧮</div><div style={{ fontSize: 22, fontWeight: 900, color: "var(--neon2)", fontFamily: "'JetBrains Mono',monospace" }}>{score} solved</div><p style={{ color: "var(--dim)", fontSize: 13, marginTop: 6 }}>Best: {best}</p><div style={{ marginTop: 14 }}><Btn onClick={function(){ setTimeLeft(20); startGame(); }} color="var(--cool)" glow>Play Again</Btn></div></>}
+      {active && problem && <><div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 14 }}><Tag label="SCORE" value={score} color="var(--green)" /><Tag label="TIME" value={timeLeft + "s"} color={timeLeft <= 5 ? "var(--accent)" : "var(--cool)"} /></div>
+        <div style={{ fontSize: 38, fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: "var(--text)", marginBottom: 20 }}>{problem}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxWidth: 260, margin: "0 auto" }}>{choices.map(function(c, i){ return <button key={i} onClick={function(){ pick2(c); }} style={{ padding: "14px", borderRadius: 10, fontSize: 18, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", background: "var(--surface2)", color: "var(--text)", border: "2px solid var(--border)" }}>{c.val}</button>; })}</div>
+        {feedback === "ok" && <div style={{ color: "var(--green)", fontWeight: 700, marginTop: 8, animation: "fadeUp 0.2s" }}>✓</div>}
+        {feedback === "no" && <div style={{ color: "var(--accent)", fontWeight: 700, marginTop: 8, animation: "shake 0.3s" }}>✗</div>}
+      </>}
+    </Panel>
+  </GameWrap>;
+}
+
+/* ═══ SAFE GAME 4: EMOJI HUNT ════════════════════════════════════ */
+function EmojiHunt({ chips, setChips, onBack, safeMode }) {
+  const SETS = [["😀","😃"],["🐶","🐕"],["🌸","🌺"],["⭐","🌟"],["🔵","🔷"],["🟢","🟩"],["🎈","🎀"],["📘","📗"],["🍎","🍏"],["🐱","🐈"]];
+  const [score, setScore] = useState(0); const [best, setBest] = useState(0); const [grid, setGrid] = useState([]); const [oddIdx, setOddIdx] = useState(-1); const [gridSize, setGridSize] = useState(9); const [feedback, setFeedback] = useState(null);
+  function genGrid() {
+    const set = SETS[Math.floor(Math.random() * SETS.length)];
+    const main = set[0], odd = set[1];
+    const sz = Math.min(36, gridSize);
+    const idx = Math.floor(Math.random() * sz);
+    const g = []; for (let i = 0; i < sz; i++) g.push(i === idx ? odd : main);
+    setGrid(g); setOddIdx(idx); setFeedback(null);
+  }
+  function startGame() { setScore(0); setGridSize(9); genGrid(); }
+  function clickTile(i) { if (feedback) return; if (i === oddIdx) { const ns = score + 1; setScore(ns); if (ns > best) setBest(ns); setFeedback("ok"); const nextSize = Math.min(36, 9 + ns * 3); setGridSize(nextSize); setTimeout(genGrid, 500); } else { setFeedback("no"); setTimeout(function(){ setFeedback(null); }, 400); } }
+  useEffect(function() { genGrid(); }, []);
+  const cols = gridSize <= 9 ? 3 : gridSize <= 16 ? 4 : gridSize <= 25 ? 5 : 6;
+
+  return <GameWrap title="🔍 Emoji Hunt" titleColor="var(--neon)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 14 }}><Tag label="FOUND" value={score} color="var(--green)" /><Tag label="BEST" value={best} color="var(--neon2)" /><Tag label="GRID" value={gridSize} color="var(--cool)" /></div>
+      <p style={{ color: "var(--dim)", fontSize: 12, marginBottom: 12 }}>Find the emoji that's different!</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(" + cols + ",1fr)", gap: 6, maxWidth: 320, margin: "0 auto 14px" }}>{grid.map(function(emoji, i){ return <div key={i} onClick={function(){ clickTile(i); }} style={{ aspectRatio: "1", borderRadius: 10, background: feedback === "ok" && i === oddIdx ? "rgba(74,222,128,0.15)" : "var(--surface2)", border: feedback === "ok" && i === oddIdx ? "2px solid var(--green)" : "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: gridSize <= 16 ? 28 : gridSize <= 25 ? 22 : 18, cursor: "pointer", transition: "all 0.15s" }}>{emoji}</div>; })}</div>
+      {feedback === "ok" && <div style={{ color: "var(--green)", fontWeight: 700, animation: "fadeUp 0.2s" }}>✓ Found it!</div>}
+      {feedback === "no" && <div style={{ color: "var(--accent)", fontWeight: 700, animation: "shake 0.3s" }}>✗ Try again!</div>}
+    </Panel>
+  </GameWrap>;
+}
+
+/* ═══ SAFE GAME 5: SEQUENCE MEMORY ═══════════════════════════════ */
+function SequenceMemory({ chips, setChips, onBack, safeMode }) {
+  const COLORS_SEQ = ["#e74c3c","#3498db","#27ae60","#f1c40f"];
+  const [sequence, setSequence] = useState([]); const [playerSeq, setPlayerSeq] = useState([]); const [phase, setPhase] = useState("start"); const [activeBtn, setActiveBtn] = useState(-1); const [level, setLevel] = useState(0); const [best, setBest] = useState(0);
+  async function startGame() { setLevel(1); setSequence([]); await nextRound([Math.floor(Math.random() * 4)]); }
+  async function nextRound(seq) { setPhase("show"); setSequence(seq); setPlayerSeq([]); for (let i = 0; i < seq.length; i++) { await delay(300); setActiveBtn(seq[i]); await delay(400); setActiveBtn(-1); await delay(150); } setPhase("input"); }
+  async function pressBtn(idx) { if (phase !== "input") return; setActiveBtn(idx); setTimeout(function(){ setActiveBtn(-1); }, 200); const newPS = playerSeq.concat([idx]); setPlayerSeq(newPS); const i = newPS.length - 1; if (newPS[i] !== sequence[i]) { setPhase("fail"); if (sequence.length > best) setBest(sequence.length); return; } if (newPS.length === sequence.length) { const nl = level + 1; setLevel(nl); await delay(600); const ns = sequence.concat([Math.floor(Math.random() * 4)]); await nextRound(ns); } }
+  return <GameWrap title="🧩 Sequence" titleColor="#3498db" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 14 }}><Tag label="LEVEL" value={level} color="var(--cool)" /><Tag label="BEST" value={best} color="var(--green)" /></div>
+      {phase === "start" && <><p style={{ color: "var(--dim)", fontSize: 14, marginBottom: 14 }}>Watch the sequence, then repeat it!</p><Btn onClick={startGame} color="#3498db" glow>Start</Btn></>}
+      {phase === "fail" && <><div style={{ fontSize: 20, fontWeight: 900, color: "var(--accent)", marginBottom: 8, animation: "shake 0.3s" }}>Wrong! Level {sequence.length}</div><p style={{ color: "var(--dim)", fontSize: 13, marginBottom: 14 }}>Best: {best}</p><Btn onClick={startGame} color="#3498db" glow>Try Again</Btn></>}
+      {(phase === "show" || phase === "input") && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxWidth: 220, margin: "0 auto 14px" }}>{COLORS_SEQ.map(function(c, i){ return <div key={i} onClick={function(){ pressBtn(i); }} style={{ aspectRatio: "1", borderRadius: 14, background: activeBtn === i ? c : c + "33", border: "3px solid " + c, cursor: phase === "input" ? "pointer" : "default", transition: "all 0.15s", boxShadow: activeBtn === i ? "0 0 20px " + c + "66" : "none" }} />; })}</div>}
+      {phase === "show" && <div style={{ color: "var(--neon2)", fontSize: 13, fontWeight: 600, animation: "pulse 0.5s infinite" }}>Watch...</div>}
+      {phase === "input" && <div style={{ color: "var(--green)", fontSize: 13, fontWeight: 600 }}>Your turn! ({playerSeq.length}/{sequence.length})</div>}
+    </Panel>
+  </GameWrap>;
+}
+
+/* ═══ SAFE GAME 6: WORD SCRAMBLE ═════════════════════════════════ */
+function WordScramble({ chips, setChips, onBack, safeMode }) {
+  const WORDS = ["PLANET","GALAXY","ROCKET","COMET","METEOR","NEBULA","ORBIT","STAR","COSMIC","LUNAR","SOLAR","ASTRO","QUASAR","NOVA","ECLIPSE","AURORA","SATURN","VENUS","MARS","PLUTO"];
+  const [word, setWord] = useState(""); const [scrambled, setScrambled] = useState(""); const [guess, setGuess] = useState(""); const [score, setScore] = useState(0); const [best, setBest] = useState(0); const [feedback, setFeedback] = useState(null); const [hint, setHint] = useState("");
+  function scramble(w) { const a = w.split(""); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } const r = a.join(""); return r === w ? scramble(w) : r; }
+  function newWord() { const w = WORDS[Math.floor(Math.random() * WORDS.length)]; setWord(w); setScrambled(scramble(w)); setGuess(""); setFeedback(null); setHint(""); }
+  function submit() { if (guess.toUpperCase() === word) { const ns = score + 1; setScore(ns); if (ns > best) setBest(ns); setFeedback("ok"); setTimeout(newWord, 800); } else { setFeedback("no"); setTimeout(function(){ setFeedback(null); }, 500); } }
+  function showHint() { setHint(word[0] + "..." + word[word.length - 1] + " (" + word.length + " letters)"); }
+  useEffect(function() { newWord(); }, []);
+  return <GameWrap title="🔤 Word Scramble" titleColor="var(--neon)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 14 }}><Tag label="SOLVED" value={score} color="var(--green)" /><Tag label="BEST" value={best} color="var(--neon2)" /></div>
+      <div style={{ fontSize: 36, fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 6, color: "var(--neon2)", marginBottom: 16 }}>{scrambled}</div>
+      {hint && <div style={{ fontSize: 12, color: "var(--dim)", marginBottom: 8 }}>Hint: {hint}</div>}
+      <input value={guess} onChange={function(e){ setGuess(e.target.value.toUpperCase()); }} onKeyDown={function(e){ if (e.key === "Enter") submit(); }} placeholder="Type your answer..." style={{ width: "100%", maxWidth: 260, padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "2px solid var(--border)", color: "var(--text)", fontSize: 16, fontFamily: "'JetBrains Mono',monospace", textAlign: "center", letterSpacing: 2, outline: "none" }} />
+      <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
+        <Btn onClick={submit} color="var(--green)" glow>Submit</Btn>
+        <Btn onClick={showHint} color="var(--dim)">Hint</Btn>
+        <Btn onClick={newWord} color="var(--accent)">Skip</Btn>
+      </div>
+      {feedback === "ok" && <div style={{ color: "var(--green)", fontWeight: 700, marginTop: 10, animation: "fadeUp 0.2s" }}>✓ Correct!</div>}
+      {feedback === "no" && <div style={{ color: "var(--accent)", fontWeight: 700, marginTop: 10, animation: "shake 0.3s" }}>✗ Try again!</div>}
+    </Panel>
+  </GameWrap>;
+}
+
+/* ═══ SAFE GAME 7: AIM TRAINER ═══════════════════════════════════ */
+function AimTrainer({ chips, setChips, onBack, safeMode }) {
+  const [score, setScore] = useState(0); const [best, setBest] = useState(0); const [targetPos, setTargetPos] = useState(null); const [timeLeft, setTimeLeft] = useState(15); const [active, setActive] = useState(false); const [targetSize, setTargetSize] = useState(50);
+  const timerRef = useRef(null); const areaRef = useRef(null);
+  function spawnTarget() {
+    const sz = Math.max(24, 50 - score * 2);
+    setTargetSize(sz);
+    setTargetPos({ x: 10 + Math.random() * 80, y: 10 + Math.random() * 80 });
+  }
+  function startGame() { setScore(0); setTimeLeft(15); setActive(true); setTargetSize(50); spawnTarget(); }
+  function hitTarget() { if (!active) return; const ns = score + 1; setScore(ns); if (ns > best) setBest(ns); spawnTarget(); }
+  useEffect(function() { if (!active) return; timerRef.current = setInterval(function(){ setTimeLeft(function(t){ if (t <= 1) { setActive(false); clearInterval(timerRef.current); return 0; } return t - 1; }); }, 1000); return function(){ clearInterval(timerRef.current); }; }, [active]);
+
+  return <GameWrap title="🎯 Aim Trainer" titleColor="var(--accent)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 14 }}><Tag label="HITS" value={score} color="var(--green)" /><Tag label="BEST" value={best} color="var(--neon2)" />{active && <Tag label="TIME" value={timeLeft + "s"} color={timeLeft <= 5 ? "var(--accent)" : "var(--cool)"} />}</div>
+      {!active && timeLeft === 15 && <><p style={{ color: "var(--dim)", fontSize: 14, marginBottom: 14 }}>Click the targets as fast as you can!</p><Btn onClick={startGame} color="var(--accent)" glow>Start</Btn></>}
+      {!active && timeLeft === 0 && <><div style={{ fontSize: 32, marginBottom: 8 }}>🎯</div><div style={{ fontSize: 22, fontWeight: 900, color: "var(--neon2)", fontFamily: "'JetBrains Mono',monospace" }}>{score} hits</div><div style={{ marginTop: 14 }}><Btn onClick={function(){ setTimeLeft(15); startGame(); }} color="var(--accent)" glow>Play Again</Btn></div></>}
+      {active && targetPos && <div ref={areaRef} style={{ position: "relative", width: "100%", height: 280, background: "var(--surface2)", borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden", cursor: "crosshair" }}>
+        <div onClick={hitTarget} style={{ position: "absolute", left: targetPos.x + "%", top: targetPos.y + "%", width: targetSize, height: targetSize, borderRadius: "50%", background: "radial-gradient(circle,var(--accent),#c0392b)", border: "2px solid rgba(255,255,255,0.3)", transform: "translate(-50%,-50%)", cursor: "pointer", animation: "popIn 0.2s", boxShadow: "0 0 16px rgba(255,94,120,0.4)" }} />
+      </div>}
+    </Panel>
+  </GameWrap>;
+}
+
+
+/* ═══ SAFE GAME 8: TYPING SPEED (MonkeyType-style) ═══════════════ */
+var TYPING_WORDS = ["the","be","to","of","and","a","in","that","have","i","it","for","not","on","with","he","as","you","do","at","this","but","his","by","from","they","we","her","she","or","an","will","my","one","all","would","there","their","what","so","up","out","if","about","who","get","which","go","me","when","make","can","like","time","no","just","him","know","take","people","into","year","your","good","some","could","them","see","other","than","then","now","look","only","come","its","over","think","also","back","after","use","two","how","our","work","first","well","way","even","new","want","because","any","these","give","day","most","us","great","big","small","long","right","old","high","last","every","never","same","few","hand","find","here","thing","many","still","between","name","should","home","show","world","need","much","state","while","part","keep","place","where","try","start","point","each","help","own","life","head","turn","real","leave","might","play","run","move","live","school","through","change","house","put","end","close","open","under","tell","water","body","ask","room","read","food","door","write","air","light","let","city","side","land","line","next","very","number","word","study","hard","music","call","may","hold","three","stand","best","again","late","both","idea","game","set","off","sure","free","fact","early","left","car","plan","table","order","half","step","full","lot","kind","talk","power","group","stop","test","book","carry","young","cut","mean","mark","drive","fire","begin","war","love","feel","river","form","tree","week","add","area","job","today","class","cost","face","age","paper","month","south","north","west","east","system","level","build","below","rate","simple","case","piece","bit","fast","slow","human","clear","key","always","done","seen","away","though","enough","along","watch","without","yet","inside","care","stay","often","story","before","child","point","seem","down","such","night","large","above","second","until","answer","able","once","hard","toward","bring","near","grow","draw","lead","dark","note","voice","fall","quite","eat","land","girl","boy","ready","sound","reach","appear","serve","wait","pass","cover","speak","letter","spend","happen","else","learn","plant","share","sense","press","enter","final","less","pick","main","space","white","black","green","blue","image","road","data","field","thank","price","cold","true","pull","base","wrong","sign","drop","visit","deal","store","ahead","born","hope","soft","join","cross","hit","push","low","quick","round","check","rest","pair","heat","deep","touch","shape","brown","front","total","rise","fight","common","single","among","ground","catch","train","window","direct","view","public","class","match","flat","edge","laugh","ring","guess","glass","dream","focus","dance","rock","search","weather","team","record","likely","board","past","wear","return","chance","sweet","truck","least","floor","listen","scene","beyond","front","break","camp","wild","ocean","month","scene","clean","finger","tiny","print","quiet","fresh","treat","raise","stone","count","trust"];
+function TypingSpeed({ chips, setChips, onBack, safeMode }) {
+  var inputRef = useRef(null);
+  var timerRef = useRef(null);
+  var startRef = useRef(0);
+  var wordAreaRef = useRef(null);
+  var wpmHistoryRef = useRef([]);
+  var DURATIONS = [15, 30, 60];
+  var WORD_COUNTS = [10, 25, 50];
+  var [mode, setMode] = useState("time");
+  var [duration, setDuration] = useState(30);
+  var [wordTarget, setWordTarget] = useState(25);
+  var [phase, setPhase] = useState("ready");
+  var [words, setWords] = useState([]);
+  var [wordIdx, setWordIdx] = useState(0);
+  var [input, setInput] = useState("");
+  var [wordStates, setWordStates] = useState([]);
+  var [timeLeft, setTimeLeft] = useState(30);
+  var [elapsed, setElapsed] = useState(0);
+  var [wpm, setWpm] = useState(0);
+  var [rawWpm, setRawWpm] = useState(0);
+  var [accuracy, setAccuracy] = useState(100);
+  var [consistency, setConsistency] = useState(0);
+  var [stats, setStats] = useState({ correct: 0, incorrect: 0, extra: 0, missed: 0, correctWords: 0, wrongWords: 0 });
+  var [best, setBest] = useState(0);
+  var [liveWpm, setLiveWpm] = useState(0);
+  var [liveAcc, setLiveAcc] = useState(100);
+  var [wpmHistory, setWpmHistory] = useState([]);
+
+  function genWords(count) {
+    var w = [];
+    for (var i = 0; i < count; i++) w.push(TYPING_WORDS[Math.floor(Math.random() * TYPING_WORDS.length)]);
+    return w;
+  }
+
+  function resetGame(dur, wt, m) {
+    var d = dur || duration;
+    var wc = wt || wordTarget;
+    var md = m || mode;
+    clearInterval(timerRef.current);
+    var count = md === "words" ? wc + 10 : 200;
+    var w = genWords(count);
+    setWords(w);
+    setWordIdx(0);
+    setInput("");
+    setWordStates([]);
+    setTimeLeft(d);
+    setElapsed(0);
+    setWpm(0);
+    setRawWpm(0);
+    setAccuracy(100);
+    setConsistency(0);
+    setStats({ correct: 0, incorrect: 0, extra: 0, missed: 0, correctWords: 0, wrongWords: 0 });
+    setLiveWpm(0);
+    setLiveAcc(100);
+    setWpmHistory([]);
+    wpmHistoryRef.current = [];
+    setPhase("ready");
+    startRef.current = 0;
+    if (wordAreaRef.current) wordAreaRef.current.scrollTop = 0;
+  }
+
+  function startTimer() {
+    startRef.current = performance.now();
+    setPhase("typing");
+    timerRef.current = setInterval(function() {
+      var el = (performance.now() - startRef.current) / 1000;
+      setElapsed(el);
+      if (mode === "time") {
+        var left = Math.max(0, duration - el);
+        setTimeLeft(Math.ceil(left));
+        if (left <= 0) {
+          clearInterval(timerRef.current);
+          setPhase("finishing");
+        }
+      } else {
+        setTimeLeft(Math.ceil(el));
+      }
+    }, 100);
+  }
+
+  useEffect(function() {
+    if (phase === "finishing") { finishGame(); }
+  }, [phase]);
+
+  useEffect(function() {
+    resetGame(duration, wordTarget, mode);
+    return function() { clearInterval(timerRef.current); };
+  }, [duration, wordTarget, mode]);
+
+  // Per-second WPM sampling for history graph
+  useEffect(function() {
+    if (phase !== "typing") return;
+    var sampleInterval = setInterval(function() {
+      var el = (performance.now() - startRef.current) / 1000;
+      if (el < 1) return;
+      var correctSoFar = 0;
+      var totalSoFar = 0;
+      for (var i = 0; i < wordStates.length; i++) {
+        var target = words[i] || "";
+        for (var j = 0; j < Math.max(wordStates[i].length, target.length); j++) {
+          if (j < wordStates[i].length && j < target.length) {
+            if (wordStates[i][j] === target[j]) correctSoFar++;
+            totalSoFar++;
+          } else if (j >= target.length) { totalSoFar++; }
+        }
+      }
+      var secWpm = Math.round((correctSoFar / 5) / (el / 60));
+      var rawSecWpm = Math.round((totalSoFar / 5) / (el / 60));
+      wpmHistoryRef.current = wpmHistoryRef.current.concat([{ t: Math.round(el), wpm: secWpm, raw: rawSecWpm }]);
+    }, 1000);
+    return function() { clearInterval(sampleInterval); };
+  }, [phase, wordStates, words]);
+
+  function calcStats(ws, w, curInput, curWordIdx) {
+    var correctChars = 0;
+    var incorrectChars = 0;
+    var extraChars = 0;
+    var missedChars = 0;
+    var totalTyped = 0;
+    var correctWords = 0;
+    var wrongWords = 0;
+    for (var i = 0; i < ws.length; i++) {
+      var typed = ws[i];
+      var target = w[i] || "";
+      var wordCorrect = true;
+      for (var j = 0; j < Math.max(typed.length, target.length); j++) {
+        if (j < typed.length && j < target.length) {
+          if (typed[j] === target[j]) correctChars++;
+          else { incorrectChars++; wordCorrect = false; }
+          totalTyped++;
+        } else if (j >= target.length) {
+          extraChars++; totalTyped++; wordCorrect = false;
+        } else {
+          missedChars++; wordCorrect = false;
+        }
+      }
+      if (wordCorrect) correctWords++; else wrongWords++;
+    }
+    // Include current unfinished word
+    if (curWordIdx < w.length && curInput && curInput.length > 0) {
+      var curTarget = w[curWordIdx] || "";
+      for (var k = 0; k < Math.max(curInput.length, curTarget.length); k++) {
+        if (k < curInput.length && k < curTarget.length) {
+          if (curInput[k] === curTarget[k]) correctChars++;
+          else incorrectChars++;
+          totalTyped++;
+        } else if (k >= curTarget.length) {
+          extraChars++; totalTyped++;
+        } else { missedChars++; }
+      }
+    }
+    return { correctChars: correctChars, incorrectChars: incorrectChars, extraChars: extraChars, missedChars: missedChars, totalTyped: totalTyped, correctWords: correctWords, wrongWords: wrongWords };
+  }
+
+  function calcConsistency(hist) {
+    if (hist.length < 3) return 100;
+    var vals = hist.map(function(h) { return h.wpm; });
+    var mean = vals.reduce(function(a, b) { return a + b; }, 0) / vals.length;
+    if (mean === 0) return 0;
+    var variance = vals.reduce(function(a, b) { return a + Math.pow(b - mean, 2); }, 0) / vals.length;
+    var cv = (Math.sqrt(variance) / mean) * 100;
+    return Math.max(0, Math.min(100, Math.round(100 - cv)));
+  }
+
+  function finishGame() {
+    clearInterval(timerRef.current);
+    var finalElapsed = mode === "time" ? duration : (performance.now() - startRef.current) / 1000;
+    var s = calcStats(wordStates, words, input, wordIdx);
+    var minutes = finalElapsed / 60;
+    var netW = Math.round((s.correctChars / 5) / minutes);
+    var rawW = Math.round((s.totalTyped / 5) / minutes);
+    var acc = s.totalTyped > 0 ? Math.round((s.correctChars / s.totalTyped) * 100) : 0;
+    var hist = wpmHistoryRef.current;
+    var cons = calcConsistency(hist);
+    setWpm(netW);
+    setRawWpm(rawW);
+    setAccuracy(acc);
+    setConsistency(cons);
+    setStats({ correct: s.correctChars, incorrect: s.incorrectChars, extra: s.extraChars, missed: s.missedChars, correctWords: s.correctWords, wrongWords: s.wrongWords });
+    setWpmHistory(hist);
+    if (netW > best) setBest(netW);
+    setElapsed(finalElapsed);
+    setPhase("result");
+  }
+
+  function handleInputChange(e) {
+    if (phase === "result" || phase === "finishing") return;
+    var val = e.target.value;
+    if (phase === "ready" && val.length > 0) startTimer();
+    if (val.endsWith(" ")) {
+      var trimmed = val.trim();
+      if (trimmed.length === 0) { setInput(""); return; }
+      var ws2 = wordStates.concat([trimmed]);
+      setWordStates(ws2);
+      var nextIdx = wordIdx + 1;
+      setWordIdx(nextIdx);
+      setInput("");
+      if (inputRef.current) inputRef.current.value = "";
+      // Check word count mode completion
+      if (mode === "words" && nextIdx >= wordTarget) {
+        clearInterval(timerRef.current);
+        setPhase("finishing");
+      }
+      return;
+    }
+    setInput(val);
+  }
+
+  function handleKeyDown(e) {
+    if (phase === "result" || phase === "finishing") return;
+    if (e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+      if (input.length === 0) return;
+      if (phase === "ready") startTimer();
+      var ws2 = wordStates.concat([input]);
+      setWordStates(ws2);
+      var nextIdx = wordIdx + 1;
+      setWordIdx(nextIdx);
+      setInput("");
+      if (inputRef.current) inputRef.current.value = "";
+      if (mode === "words" && nextIdx >= wordTarget) {
+        clearInterval(timerRef.current);
+        setPhase("finishing");
+      }
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      resetGame();
+      setTimeout(function() { if (inputRef.current) inputRef.current.focus(); }, 50);
+    }
+  }
+
+  // Live WPM + accuracy updates
+  useEffect(function() {
+    if (phase === "typing" && startRef.current > 0) {
+      var el = (performance.now() - startRef.current) / 1000;
+      if (el > 0.5) {
+        var s = calcStats(wordStates, words, input, wordIdx);
+        setLiveWpm(Math.round((s.correctChars / 5) / (el / 60)));
+        setLiveAcc(s.totalTyped > 0 ? Math.round((s.correctChars / s.totalTyped) * 100) : 100);
+      }
+    }
+  }, [wordStates, input, timeLeft]);
+
+  // Auto-scroll word area to keep active word visible
+  useEffect(function() {
+    if (!wordAreaRef.current) return;
+    var activeWord = wordAreaRef.current.querySelector("[data-active='true']");
+    if (activeWord) {
+      var containerRect = wordAreaRef.current.getBoundingClientRect();
+      var wordRect = activeWord.getBoundingClientRect();
+      var relativeTop = wordRect.top - containerRect.top + wordAreaRef.current.scrollTop;
+      var targetScroll = relativeTop - 30;
+      if (targetScroll > wordAreaRef.current.scrollTop + 10) {
+        wordAreaRef.current.scrollTop = targetScroll;
+      }
+    }
+  }, [wordIdx, input]);
+
+  function focusInput() { if (inputRef.current) inputRef.current.focus(); }
+
+  useEffect(function() {
+    if (phase === "ready" || phase === "typing") focusInput();
+  }, [phase]);
+
+  // Simple WPM chart using styled divs
+  function WpmChart({ history }) {
+    if (!history || history.length < 2) return null;
+    var maxWpm = Math.max.apply(null, history.map(function(h){ return Math.max(h.wpm, h.raw); }).concat([10]));
+    var chartH = 80;
+    return <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 10, color: "var(--dim)", marginBottom: 4, fontWeight: 600, letterSpacing: 0.5 }}>WPM OVER TIME</div>
+      <div style={{ position: "relative", height: chartH, background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden", padding: "4px 0" }}>
+        {/* Grid lines */}
+        {[0.25, 0.5, 0.75].map(function(f) { return <div key={f} style={{ position: "absolute", top: (f * 100) + "%", left: 0, right: 0, height: 1, background: "var(--border)", opacity: 0.4 }} />; })}
+        {/* Raw WPM line (behind) */}
+        <svg viewBox={"0 0 " + (history.length - 1) + " " + chartH} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} preserveAspectRatio="none">
+          <polyline fill="none" stroke="rgba(107,107,128,0.3)" strokeWidth="1.5" points={history.map(function(h, i) { return i + "," + (chartH - (h.raw / maxWpm) * (chartH - 8) - 4); }).join(" ")} />
+          <polyline fill="none" stroke="var(--cool)" strokeWidth="2" points={history.map(function(h, i) { return i + "," + (chartH - (h.wpm / maxWpm) * (chartH - 8) - 4); }).join(" ")} />
+        </svg>
+        {/* Labels */}
+        <div style={{ position: "absolute", top: 2, left: 4, fontSize: 9, color: "var(--dim)", opacity: 0.6 }}>{maxWpm}</div>
+        <div style={{ position: "absolute", bottom: 2, left: 4, fontSize: 9, color: "var(--dim)", opacity: 0.6 }}>0</div>
+        <div style={{ position: "absolute", bottom: 2, right: 4, fontSize: 9, color: "var(--dim)", opacity: 0.6 }}>{history.length}s</div>
+      </div>
+      <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 4 }}>
+        <span style={{ fontSize: 10, color: "var(--cool)" }}>{"\u2501"} WPM</span>
+        <span style={{ fontSize: 10, color: "var(--dim)" }}>{"\u2501"} Raw</span>
+      </div>
+    </div>;
+  }
+
+  var displayWords = words.slice(0, Math.min(words.length, wordIdx + 60));
+  var wordsCompleted = wordStates.length;
+
+  return <GameWrap title={"\u2328\uFE0F Typing Speed"} titleColor="var(--cool)" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    {phase !== "result" && <Panel>
+      {/* Mode selector + duration/word count */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button onClick={function(){ if (phase !== "typing") { setMode("time"); resetGame(duration, wordTarget, "time"); } }} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: mode === "time" ? "var(--cool)" : "var(--surface2)", color: mode === "time" ? "#000" : "var(--dim)", border: mode === "time" ? "2px solid var(--cool)" : "1px solid var(--border)", fontFamily: "'JetBrains Mono',monospace", opacity: phase === "typing" ? 0.4 : 1 }}>time</button>
+          <button onClick={function(){ if (phase !== "typing") { setMode("words"); resetGame(duration, wordTarget, "words"); } }} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: mode === "words" ? "var(--cool)" : "var(--surface2)", color: mode === "words" ? "#000" : "var(--dim)", border: mode === "words" ? "2px solid var(--cool)" : "1px solid var(--border)", fontFamily: "'JetBrains Mono',monospace", opacity: phase === "typing" ? 0.4 : 1 }}>words</button>
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {mode === "time" ? DURATIONS.map(function(d) { return <button key={d} onClick={function(){ if (phase !== "typing") { setDuration(d); resetGame(d, wordTarget, "time"); } }} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: duration === d ? "var(--neon2)" : "var(--surface2)", color: duration === d ? "#000" : "var(--dim)", border: duration === d ? "2px solid var(--neon2)" : "1px solid var(--border)", fontFamily: "'JetBrains Mono',monospace", opacity: phase === "typing" ? 0.4 : 1 }}>{d}</button>; })
+          : WORD_COUNTS.map(function(wc) { return <button key={wc} onClick={function(){ if (phase !== "typing") { setWordTarget(wc); resetGame(duration, wc, "words"); } }} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: wordTarget === wc ? "var(--neon2)" : "var(--surface2)", color: wordTarget === wc ? "#000" : "var(--dim)", border: wordTarget === wc ? "2px solid var(--neon2)" : "1px solid var(--border)", fontFamily: "'JetBrains Mono',monospace", opacity: phase === "typing" ? 0.4 : 1 }}>{wc}</button>; })}
+        </div>
+      </div>
+      {/* Live stats bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {phase === "typing" && <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: "var(--cool)", fontWeight: 700 }}>{liveWpm} wpm</span>}
+          {phase === "typing" && <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: liveAcc >= 95 ? "var(--green)" : liveAcc >= 80 ? "var(--neon2)" : "var(--accent)" }}>{liveAcc}%</span>}
+          {phase === "typing" && <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "var(--dim)" }}>{wordsCompleted}{mode === "words" ? "/" + wordTarget : ""} words</span>}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {phase === "typing" && <button onClick={function(){ resetGame(); setTimeout(function(){ if (inputRef.current) inputRef.current.focus(); }, 50); }} style={{ padding: "2px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)", fontFamily: "'JetBrains Mono',monospace" }} title="Tab to restart">{"\u21BA"}</button>}
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 18, fontWeight: 700, color: mode === "time" ? (timeLeft <= 5 ? "var(--accent)" : "var(--neon2)") : "var(--neon2)" }}>{mode === "time" ? timeLeft + "s" : Math.floor(elapsed) + "s"}</span>
+        </div>
+      </div>
+      {/* Word display area */}
+      <div ref={wordAreaRef} onClick={focusInput} style={{ minHeight: 90, maxHeight: 130, overflow: "hidden", padding: "8px 6px", cursor: "text", position: "relative", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", marginBottom: 12, lineHeight: 2.1 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 8px", fontFamily: "'JetBrains Mono',monospace", fontSize: 17 }}>
+          {displayWords.map(function(word, wi) {
+            var actualIdx = wi;
+            var isActive = actualIdx === wordIdx;
+            var isTyped = actualIdx < wordIdx;
+            var typedWord = isTyped ? wordStates[actualIdx] : (isActive ? input : null);
+            var wordCorrect = isTyped && typedWord === word;
+            var wordWrong = isTyped && typedWord !== word;
+            return <span key={wi} data-active={isActive ? "true" : "false"} style={{ position: "relative", borderBottom: isActive ? "2px solid var(--cool)" : "none", paddingBottom: 1, textDecoration: wordWrong ? "underline" : "none", textDecorationColor: wordWrong ? "rgba(255,94,120,0.4)" : "none" }}>
+              {word.split("").map(function(ch, ci) {
+                var col = "rgba(107,107,128,0.5)";
+                if (isTyped || isActive) {
+                  if (typedWord && ci < typedWord.length) {
+                    col = typedWord[ci] === ch ? "#4ade80" : "#ff5e78";
+                  } else if (isTyped) {
+                    col = "rgba(255,94,120,0.4)";
+                  }
+                }
+                var showCaret = isActive && ci === (input ? input.length : 0) && phase !== "ready";
+                return <span key={ci} style={{ color: col, position: "relative", transition: "color 0.05s" }}>
+                  {showCaret && <span style={{ position: "absolute", left: -1, top: 2, bottom: 2, width: 2, background: "var(--neon2)", animation: "neonPulse 1s ease-in-out infinite", borderRadius: 1 }} />}
+                  {ch}
+                </span>;
+              })}
+              {isTyped && typedWord && typedWord.length > word.length && <span style={{ color: "rgba(255,94,120,0.5)", fontSize: 15 }}>{typedWord.slice(word.length)}</span>}
+              {isActive && input.length > word.length && <span style={{ color: "rgba(255,94,120,0.5)", fontSize: 15 }}>{input.slice(word.length)}</span>}
+            </span>;
+          })}
+        </div>
+        {phase === "ready" && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4, background: "rgba(26,26,46,0.88)", borderRadius: 10 }}><span style={{ color: "var(--cool)", fontSize: 14, fontWeight: 600 }}>Start typing to begin...</span><span style={{ color: "var(--dim)", fontSize: 11 }}>Tab to restart anytime</span></div>}
+      </div>
+      {/* Hidden input */}
+      <input ref={inputRef} autoFocus value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck="false" style={{ position: "absolute", opacity: 0, width: 1, height: 1, top: -100 }} />
+      {phase === "ready" && <div style={{ textAlign: "center" }}><p style={{ color: "var(--dim)", fontSize: 12, marginTop: 4 }}>{mode === "time" ? "Type for " + duration + " seconds. Timer starts on first keypress." : "Type " + wordTarget + " words as fast as you can."}</p></div>}
+    </Panel>}
+    {phase === "result" && <Panel style={{ textAlign: "center" }}>
+      <div style={{ fontSize: 36, marginBottom: 8 }}>{"\u2328\uFE0F"}</div>
+      <div style={{ fontSize: 36, fontWeight: 900, color: "var(--cool)", fontFamily: "'JetBrains Mono',monospace" }}>{wpm} <span style={{ fontSize: 16, color: "var(--dim)", fontWeight: 600 }}>WPM</span></div>
+      <div style={{ fontSize: 13, color: "var(--dim)", marginTop: 2, marginBottom: 14 }}>Raw: {rawWpm} WPM · {mode === "time" ? duration + "s" : wordTarget + " words in " + Math.round(elapsed) + "s"}</div>
+      {/* WPM Graph */}
+      <WpmChart history={wpmHistory} />
+      {/* Key metrics */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        <Tag label="ACCURACY" value={accuracy + "%"} color={accuracy >= 95 ? "var(--green)" : accuracy >= 80 ? "var(--neon2)" : "var(--accent)"} />
+        <Tag label="CONSISTENCY" value={consistency + "%"} color={consistency >= 80 ? "var(--green)" : consistency >= 60 ? "var(--neon2)" : "var(--accent)"} />
+        <Tag label="BEST" value={best + " WPM"} color="var(--neon)" />
+      </div>
+      {/* Character breakdown */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 12, flexWrap: "wrap" }}>
+        <div style={{ padding: "5px 10px", borderRadius: 7, background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.2)", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>
+          <span style={{ color: "var(--dim)" }}>correct </span><span style={{ color: "var(--green)", fontWeight: 700 }}>{stats.correct}</span>
+        </div>
+        <div style={{ padding: "5px 10px", borderRadius: 7, background: "rgba(255,94,120,0.1)", border: "1px solid rgba(255,94,120,0.2)", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>
+          <span style={{ color: "var(--dim)" }}>wrong </span><span style={{ color: "var(--accent)", fontWeight: 700 }}>{stats.incorrect}</span>
+        </div>
+        <div style={{ padding: "5px 10px", borderRadius: 7, background: "rgba(255,207,86,0.1)", border: "1px solid rgba(255,207,86,0.2)", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>
+          <span style={{ color: "var(--dim)" }}>extra </span><span style={{ color: "var(--neon2)", fontWeight: 700 }}>{stats.extra}</span>
+        </div>
+        <div style={{ padding: "5px 10px", borderRadius: 7, background: "rgba(107,107,128,0.1)", border: "1px solid rgba(107,107,128,0.2)", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>
+          <span style={{ color: "var(--dim)" }}>missed </span><span style={{ color: "var(--dim)", fontWeight: 700 }}>{stats.missed}</span>
+        </div>
+      </div>
+      {/* Word stats */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 16, fontSize: 12, color: "var(--dim)" }}>
+        <span><span style={{ color: "var(--green)", fontWeight: 700 }}>{stats.correctWords}</span> correct words</span>
+        <span><span style={{ color: "var(--accent)", fontWeight: 700 }}>{stats.wrongWords}</span> wrong words</span>
+      </div>
+      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+        <Btn onClick={function(){ resetGame(); setTimeout(focusInput, 50); }} color="var(--cool)" glow>Try Again</Btn>
+      </div>
+    </Panel>}
+    <GameGuide items={[{t:"Start Typing",d:"The timer starts when you type your first character. No need to click a start button. Press Tab anytime to restart with a fresh set of words."},{t:"Time vs Words Mode",d:"Time mode gives you 15, 30, or 60 seconds to type as many words as possible. Words mode challenges you to type 10, 25, or 50 specific words as fast as you can."},{t:"How WPM is Calculated",d:"Words per minute uses the standard formula: (correct characters / 5) / minutes elapsed. Every 5 characters counts as one 'word' including spaces. This is the same formula used by MonkeyType, TypeRacer, and 10FastFingers."},{t:"Raw vs Net WPM",d:"Net WPM (the big number) only counts characters in correctly typed words. Raw WPM counts every character you typed including mistakes. The bigger the gap, the more errors are costing you."},{t:"Consistency Score",d:"Measures how steady your typing speed is over time (0-100%). Calculated from the variation in your per-second WPM. High consistency (80%+) means you maintained a steady pace without big speed changes."},{t:"WPM Graph",d:"After each test, see your WPM plotted over time. The blue line is your net WPM and the gray line is your raw WPM. Look for dips that show where you slowed down or made errors."},{t:"Accuracy",d:"The percentage of characters typed correctly out of all characters attempted. Aim for 95%+ for a clean score. Anything below 80% means you should focus on accuracy over speed."},{t:"Word Submission",d:"Press space to submit your current word and move to the next. You can backspace to fix mistakes within the current word before submitting. Wrong words get an underline so you can see them in the word area."},{t:"Character Colors",d:"Green = correct character. Red = wrong character. Dim gray = not yet typed. Faded red after a word = characters you missed. Red text after a word = extra characters you typed beyond the word length."}]} title="Typing Speed Guide" />
+  </GameWrap>;
+}
+
+/* ═══ GAME 9: KENO (Rainbet style) ═══════════════════════════════ */
+function Keno({ chips, setChips, onBack, safeMode, setDebtPopup }) {
+  const TOTAL = 40; const DRAW_COUNT = 10; const MAX_PICKS = 10;
+  const [bet, setBet] = useState(10); const [picks, setPicks] = useState([]); const [drawn, setDrawn] = useState([]); const [phase, setPhase] = useState("pick"); const [result, setResult] = useState(null); const [animIdx, setAnimIdx] = useState(-1);
+  const PAYOUTS = { 1: { 1: 3.5 }, 2: { 1: 1.5, 2: 7 }, 3: { 1: 0, 2: 3, 3: 16 }, 4: { 2: 2, 3: 8, 4: 40 }, 5: { 2: 1.5, 3: 3, 4: 15, 5: 80 }, 6: { 3: 2, 4: 6, 5: 30, 6: 150 }, 7: { 3: 1.5, 4: 4, 5: 12, 6: 60, 7: 300 }, 8: { 4: 3, 5: 8, 6: 25, 7: 100, 8: 500 }, 9: { 4: 2, 5: 5, 6: 15, 7: 50, 8: 200, 9: 800 }, 10: { 5: 3, 6: 8, 7: 25, 8: 80, 9: 300, 10: 1000 } };
+  function togglePick(n) { if (phase !== "pick") return; var idx = picks.indexOf(n); if (idx >= 0) { var np = picks.slice(); np.splice(idx, 1); setPicks(np); } else if (picks.length < MAX_PICKS) { setPicks(picks.concat([n])); } }
+  function clearPicks() { setPicks([]); }
+  function autoPick() { var np = []; while (np.length < 5) { var n = Math.floor(Math.random() * TOTAL) + 1; if (np.indexOf(n) === -1) np.push(n); } setPicks(np); }
+  async function play() { if (picks.length < 1) return; if (bet > chips) { if (checkDebt(bet, chips, setBet, setDebtPopup, play)) return; } setPhase("draw"); setResult(null); setDrawn([]); setAnimIdx(-1); var nums = []; while (nums.length < DRAW_COUNT) { var n = Math.floor(Math.random() * TOTAL) + 1; if (nums.indexOf(n) === -1) nums.push(n); } for (var i = 0; i < nums.length; i++) { await delay(280); setDrawn(function(prev) { return prev.concat([nums[i]]); }); setAnimIdx(i); } await delay(500); var hits = 0; for (var j = 0; j < picks.length; j++) { if (nums.indexOf(picks[j]) >= 0) hits++; } var pt = PAYOUTS[picks.length]; var multi = (pt && pt[hits]) || 0; var profit = Math.floor(bet * multi) - bet; if (profit > 0) { setChips(function(c){ return c + profit; }); setResult({ type: "win", text: hits + " hits! " + multi + "x = +" + profit }); } else if (profit < 0) { setChips(function(c){ return c + profit; }); setResult({ type: "lose", text: hits + " hits. -" + bet }); } else if (multi > 0) { setResult({ type: "win", text: hits + " hits! Even!" }); } else { setChips(function(c){ return c - bet; }); setResult({ type: "lose", text: hits + " hits. -" + bet }); } setPhase("result"); }
+  var grid = []; for (var i = 1; i <= TOTAL; i++) grid.push(i);
+  var cols = 8;
+  return <GameWrap title="🎱 Keno" titleColor="#e67e22" chips={chips} setChips={setChips} onBack={onBack} safeMode={safeMode}>
+    <Panel style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+        <Tag label="PICKS" value={picks.length + "/" + MAX_PICKS} color="var(--neon2)" />
+        {phase !== "pick" && <Tag label="HITS" value={function(){ var h=0; for(var j=0;j<picks.length;j++) if(drawn.indexOf(picks[j])>=0) h++; return h; }()} color="var(--green)" />}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(" + cols + ",1fr)", gap: 4, maxWidth: 360, margin: "0 auto 12px" }}>{grid.map(function(n){ var picked = picks.indexOf(n) >= 0; var isDrawn = drawn.indexOf(n) >= 0; var hit = picked && isDrawn; var miss = isDrawn && !picked; return <div key={n} onClick={function(){ togglePick(n); }} style={{ padding: "6px 0", borderRadius: 7, textAlign: "center", fontSize: 13, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", cursor: phase === "pick" ? "pointer" : "default", background: hit ? "linear-gradient(135deg,rgba(74,222,128,0.25),rgba(74,222,128,0.1))" : picked ? "#e67e22" + "25" : miss ? "rgba(86,193,255,0.12)" : "var(--surface2)", color: hit ? "var(--green)" : picked ? "#e67e22" : miss ? "var(--cool)" : "var(--dim)", border: hit ? "2px solid var(--green)" : picked ? "2px solid #e67e22" : isDrawn ? "2px solid var(--cool)" : "1px solid var(--border)", transition: "all 0.15s", animation: hit ? "popBounce 0.3s" : "none" }}>{n}</div>; })}</div>
+      {phase === "pick" && <><div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 12 }}><Btn onClick={autoPick} color="var(--dim)">Auto Pick 5</Btn><Btn onClick={clearPicks} color="var(--dim)">Clear</Btn></div><BetSelector bet={bet} setBet={setBet} chips={chips} presets={[10, 25, 50, 100]} /><div style={{ marginTop: 14 }}><Btn onClick={play} color="#e67e22" disabled={picks.length < 1} glow>{"Play (" + picks.length + " spots)"}</Btn></div></>}
+      <ResultBanner text={result ? result.text : ""} type={result ? result.type : "lose"} show={!!result && phase === "result"} />
+      <BrokeBanner chips={chips} setChips={setChips} />
+      {phase === "result" && <div style={{ marginTop: 10 }}><Btn onClick={function(){ setPhase("pick"); setDrawn([]); setResult(null); setAnimIdx(-1); }} color="#e67e22">Play Again</Btn></div>}
+    </Panel>
+    <GameGuide items={[{t:"Pick Numbers",d:"Choose between 1 and 10 numbers from a grid of 40. More picks means harder to hit but higher potential payouts."},{t:"Draw",d:"10 numbers are drawn randomly from the pool of 40. Watch them reveal one by one."},{t:"Hits",d:"Each number you picked that matches a drawn number is a hit. More hits = higher multiplier on your bet."},{t:"Auto Pick",d:"Use the Auto Pick button to randomly select 5 numbers instantly. Clear to start over."},{t:"Max Win",d:"Hitting all 10 out of 10 picks awards the maximum 1000x multiplier on your bet!"}]} title="Keno Guide" />
+  </GameWrap>;
+}
+
+const TAG_COLORS = { CARDS: "#c084fc", LUCK: "#ff5e78", RISK: "#fbbf24", SKILL: "#4ade80", INSTANT: "#8b5cf6", LOTTERY: "#e67e22", REFLEX: "#ffcf56", BRAIN: "#9b59b6", VISUAL: "#ff8c42", MEMORY: "#3498db", WORDS: "#56c1ff" };
+
+const GAME_CREDITS = [
+  { name: "Blackjack", src: "Classic casino card game — beat the dealer to 21", links: [{ t: "Rainbet", u: "https://rainbet.com/casino/game/blackjack" }, { t: "Stake", u: "https://stake.com/casino/game/blackjack" }, { t: "Duelbits", u: "https://duelbits.com" }] },
+  { name: "Higher/Lower", src: "Card prediction streak game", links: [{ t: "Rainbet", u: "https://rainbet.com" }, { t: "Stake", u: "https://stake.com" }] },
+  { name: "Lucky Slots", src: "Classic 3-reel slot machine", links: [{ t: "Rainbet Slots", u: "https://rainbet.com/casino/slots" }, { t: "Stake Slots", u: "https://stake.com/casino/slots" }, { t: "Rollbit", u: "https://rollbit.com" }] },
+  { name: "Coin Ladder", src: "Risk ladder / coin flip streak", links: [{ t: "Rainbet", u: "https://rainbet.com" }, { t: "Stake", u: "https://stake.com" }] },
+  { name: "Memory Match", src: "Classic concentration card game", links: [{ t: "Wikipedia", u: "https://en.wikipedia.org/wiki/Concentration_(card_game)" }] },
+  { name: "Mines", src: "Minesweeper-style gambling game", links: [{ t: "Rainbet Mines", u: "https://rainbet.com/casino/game/mines" }, { t: "Stake Mines", u: "https://stake.com/casino/game/mines" }, { t: "Duelbits", u: "https://duelbits.com" }] },
+  { name: "Plinko", src: "Ball-drop physics game inspired by The Price Is Right", links: [{ t: "Rainbet Plinko", u: "https://rainbet.com/casino/game/plinko" }, { t: "Stake Plinko", u: "https://stake.com/casino/game/plinko" }] },
+  { name: "Limbo", src: "Instant multiplier roll game", links: [{ t: "Rainbet Limbo", u: "https://rainbet.com/casino/game/limbo" }, { t: "Stake Limbo", u: "https://stake.com/casino/game/limbo" }] },
+  { name: "Keno", src: "Lottery-style number picker", links: [{ t: "Rainbet Keno", u: "https://rainbet.com/casino/game/keno" }, { t: "Stake Keno", u: "https://stake.com/casino/game/keno" }] },
+  { name: "Typing Speed", src: "MonkeyType-style typing test with WPM calculation", links: [{ t: "MonkeyType", u: "https://monkeytype.com" }, { t: "10FastFingers", u: "https://10fastfingers.com" }, { t: "TypeRacer", u: "https://typeracer.com" }] },
+  { name: "Reaction Test", src: "Reflex speed testing", links: [{ t: "Human Benchmark", u: "https://humanbenchmark.com/tests/reactiontime" }] },
+  { name: "Color Match", src: "Stroop effect brain teaser", links: [{ t: "Wikipedia", u: "https://en.wikipedia.org/wiki/Stroop_effect" }] },
+  { name: "Math Rush", src: "Timed mental arithmetic challenge", links: [{ t: "Mathler", u: "https://www.mathler.com" }] },
+  { name: "Emoji Hunt", src: "Visual search / odd-one-out game", links: [{ t: "Human Benchmark", u: "https://humanbenchmark.com" }] },
+  { name: "Sequence", src: "Simon-style pattern memory", links: [{ t: "Simon Game", u: "https://en.wikipedia.org/wiki/Simon_(game)" }, { t: "Human Benchmark", u: "https://humanbenchmark.com/tests/sequence" }] },
+  { name: "Word Scramble", src: "Anagram word puzzle", links: [{ t: "Wordscapes", u: "https://www.wordscapes.com" }] },
+  { name: "Aim Trainer", src: "Mouse/touch accuracy trainer", links: [{ t: "AimLabs", u: "https://aimlabs.com" }, { t: "Human Benchmark", u: "https://humanbenchmark.com/tests/aim" }] },
+];
+
+function DebtPopup({ onDebt, onAfford, onCancel }) {
+  return <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} onClick={function(e){ if (e.target === e.currentTarget) onCancel(); }}>
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "90%", maxWidth: 320, animation: "fadeUp 0.25s", textAlign: "center" }}>
+      <div style={{ fontSize: 36, marginBottom: 8 }}>⚠️</div>
+      <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)", marginBottom: 8 }}>Not Enough Chips!</div>
+      <p style={{ color: "var(--dim)", fontSize: 13, lineHeight: 1.5, marginBottom: 20 }}>Do you want to gamble and risk going into debt? Or choose a bet you can afford?</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <button onClick={onDebt} style={{ padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,#e74c3c,#c0392b)", color: "#fff", border: "2px solid #e74c3c" }}>💀 Risk Debt</button>
+        <button onClick={onAfford} style={{ padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,var(--green),#27ae60)", color: "#fff", border: "2px solid var(--green)" }}>💰 Bet What I Can</button>
+        <button onClick={onCancel} style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)", marginTop: 4 }}>Cancel</button>
+      </div>
+    </div>
+  </div>;
+}
+
+function InfoPanel({ onClose }) {
+  return <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }} onClick={function(e){ if (e.target === e.currentTarget) onClose(); }}>
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "92%", maxWidth: 400, maxHeight: "80vh", overflow: "auto", animation: "fadeUp 0.25s" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" }}>ℹ️ Game Origins</h2>
+        <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+      </div>
+      <p style={{ color: "var(--dim)", fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>Flux games are inspired by popular online casino and skill game platforms. All games use virtual chips only — no real money involved.</p>
+      {GAME_CREDITS.map(function(g){ return <div key={g.name} style={{ padding: "10px 12px", background: "var(--surface2)", borderRadius: 10, border: "1px solid var(--border)", marginBottom: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)", marginBottom: 2 }}>{g.name}</div>
+        <div style={{ fontSize: 11, color: "var(--dim)", marginBottom: 4 }}>{g.src}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{g.links.map(function(l){ return <a key={l.u} href={l.u} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: "var(--cool)", textDecoration: "underline", opacity: 0.8 }}>{l.t}</a>; })}</div>
+      </div>; })}
+      <div style={{ marginTop: 12, textAlign: "center" }}>
+        <button onClick={onClose} style={{ padding: "8px 24px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "2px solid #8b5cf6" }}>Close</button>
+      </div>
+    </div>
+  </div>;
+}
+
+const GAMES = [
+  { id: "blackjack", name: "Blackjack", icon: "🃏", desc: "Beat the dealer to 21", color: "var(--neon)", tag: "CARDS", safe: false, safeOnly: false },
+  { id: "highlow", name: "Higher / Lower", icon: "⬆️", desc: "Streak card guessing", color: "var(--cool)", tag: "CARDS", safe: false, safeOnly: false },
+  { id: "slots", name: "Lucky Slots", icon: "🎰", desc: "Spin 3 reels to match", color: "var(--accent)", tag: "LUCK", safe: false, safeOnly: false },
+  { id: "ladder", name: "Coin Ladder", icon: "🪙", desc: "Climb the risk ladder", color: "var(--neon2)", tag: "RISK", safe: false, safeOnly: false },
+  { id: "memory", name: "Memory Match", icon: "🧠", desc: "Match pairs in time", color: "var(--green)", tag: "SKILL", safe: true, safeOnly: false },
+  { id: "mines", name: "Mines", icon: "💣", desc: "Avoid hidden mines", color: "#e74c3c", tag: "RISK", safe: false, safeOnly: false },
+  { id: "plinko", name: "Plinko", icon: "📍", desc: "Physics ball drop", color: "var(--neon2)", tag: "LUCK", safe: false, safeOnly: false },
+  { id: "limbo", name: "Limbo", icon: "🚀", desc: "Beat the roll target", color: "#8b5cf6", tag: "INSTANT", safe: false, safeOnly: false },
+  { id: "reaction", name: "Reaction Test", icon: "⚡", desc: "Test your reflexes", color: "var(--neon2)", tag: "REFLEX", safe: true, safeOnly: true },
+  { id: "colormatch", name: "Color Match", icon: "🎨", desc: "Pick the right color", color: "#9b59b6", tag: "BRAIN", safe: true, safeOnly: true },
+  { id: "mathrush", name: "Math Rush", icon: "🧮", desc: "Solve problems fast", color: "var(--cool)", tag: "BRAIN", safe: true, safeOnly: true },
+  { id: "emojihunt", name: "Emoji Hunt", icon: "🔍", desc: "Find the odd one out", color: "var(--neon)", tag: "VISUAL", safe: true, safeOnly: true },
+  { id: "sequence", name: "Sequence", icon: "🧩", desc: "Remember the pattern", color: "#3498db", tag: "MEMORY", safe: true, safeOnly: true },
+  { id: "wordscramble", name: "Word Scramble", icon: "🔤", desc: "Unscramble space words", color: "var(--neon)", tag: "WORDS", safe: true, safeOnly: true },
+  { id: "aimtrainer", name: "Aim Trainer", icon: "🎯", desc: "Click targets fast", color: "var(--accent)", tag: "REFLEX", safe: true, safeOnly: true },
+  { id: "typingspeed", name: "Typing Speed", icon: "⌨️", desc: "How fast can you type?", color: "var(--cool)", tag: "SKILL", safe: true, safeOnly: true },
+  { id: "keno", name: "Keno", icon: "🎱", desc: "Pick numbers, match draws", color: "#e67e22", tag: "LOTTERY", safe: false, safeOnly: false },
+];
+
+function GameCard({ game, onClick, animDelay, reduceAnim, isWide }) {
+  const [h, setH] = useState(false);
+  const isLadder = game.id === "ladder";
+  const hoverTransform = isLadder ? "translateY(-3px) rotate(1.5deg)" : "translateY(-4px) scale(1.02)";
+  const animStr = reduceAnim ? "fadeUp 0.2s ease-out " + animDelay + "ms both" : "staggerPop 0.7s cubic-bezier(0.34,1.56,0.64,1) " + animDelay + "ms both";
+  return <div onClick={onClick} onMouseEnter={function(){ setH(true); }} onMouseLeave={function(){ setH(false); }} style={{ background: h ? "var(--surface2)" : "var(--surface)", border: h ? ("2px solid " + game.color) : "2px solid var(--border)", borderRadius: isWide ? 16 : 14, padding: isWide ? 24 : 18, cursor: "pointer", transition: "all 0.3s cubic-bezier(0.34,1.56,0.64,1)", transform: h ? hoverTransform : "translateY(0)", boxShadow: h ? ("0 8px 24px " + game.color + "1a") : "0 3px 10px rgba(0,0,0,0.2)", animation: animStr, position: "relative", overflow: "hidden", backdropFilter: "blur(8px)" }}>
+    <div style={{ position: "absolute", top: 8, right: 10, fontSize: 9, fontWeight: 700, color: (TAG_COLORS[game.tag] || game.color), background: (TAG_COLORS[game.tag] || "#888") + "30", padding: "2px 8px", borderRadius: 5, letterSpacing: 1.3, border: "1px solid " + (TAG_COLORS[game.tag] || "#888") + "55" }}>{game.tag}</div>
+    <div style={{ fontSize: isWide ? 42 : 36, marginBottom: isWide ? 10 : 8, transition: "transform 0.3s", transform: h ? "scale(1.15) rotate(-4deg)" : "scale(1)" }}>{game.icon}</div>
+    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: isWide ? 18 : 16, fontWeight: 700, color: "var(--text)", marginBottom: 2 }}>{game.name}</div>
+    <div style={{ fontSize: isWide ? 12 : 11, color: "var(--dim)" }}>{game.desc}</div>
+    {h && <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg,transparent," + game.color + ",transparent)" }} />}
+  </div>;
+}
+
+function FluxApp() {
+  const [chips, setChips] = useState(500);
+  const [game, setGame] = useState(null);
+  const [splash, setSplash] = useState("show");
+  const [hubPhase, setHubPhase] = useState("hidden"); // "hidden" | "logo" | "cards"
+  const [safeMode, setSafeMode] = useState(false);
+  const [debtPopup, setDebtPopup] = useState(null); // { onDebt, onAfford }
+  const [showInfo, setShowInfo] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [confirmToggle, setConfirmToggle] = useState(null); // "reduceOn" or "reduceOff"
+  const [reduceAnim, setReduceAnim] = useState(false);
+  const [modeKey, setModeKey] = useState(0);
+  const [isWide, setIsWide] = useState(function(){ return typeof window !== "undefined" && window.innerWidth > 900; });
+  useEffect(function() { window.__neonReduceAnim = reduceAnim; }, [reduceAnim]);
+  useEffect(function() {
+    function onResize() { setIsWide(window.innerWidth > 900); }
+    window.addEventListener("resize", onResize);
+    return function() { window.removeEventListener("resize", onResize); };
+  }, []);
+
+  useEffect(function() {
+    var minShown = false;
+    var loaded = false;
+    var done = false;
+
+    // Minimum splash display: 800ms so user sees the brand
+    var minTimer = setTimeout(function(){ minShown = true; tryTransition(); }, 800);
+
+    // Detect actual readiness: fonts + document ready
+    function checkLoaded() {
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function() { loaded = true; tryTransition(); });
+      } else {
+        loaded = true; tryTransition();
+      }
+    }
+    if (document.readyState === "complete") { checkLoaded(); }
+    else { window.addEventListener("load", checkLoaded); }
+
+    // Sequential: splash exit → wait → hub logo → wait → cards
+    function tryTransition() {
+      if (done || !minShown || !loaded) return;
+      done = true;
+      // Step 1: splash logo starts exiting (fades/moves up)
+      setSplash("exit");
+      // Step 2: splash fully gone, then show hub logo after 500ms
+      setTimeout(function(){ setSplash("done"); }, 900);
+      setTimeout(function(){ setHubPhase("logo"); }, 1900); // 900 + 1000ms gap after splash gone
+      // Step 3: cards appear 1500ms after hub logo
+      setTimeout(function(){ setHubPhase("cards"); }, 3400); // 1900 + 1500ms
+    }
+
+    return function() {
+      clearTimeout(minTimer);
+      window.removeEventListener("load", checkLoaded);
+    };
+  }, []);
+
+  const back = function() { setGame(null); };
+  const gp = { chips, setChips, onBack: back, safeMode, setDebtPopup };
+
+  if (game === "blackjack") return <Wrap><Blackjack {...gp} /></Wrap>;
+  if (game === "highlow") return <Wrap><HigherLower {...gp} /></Wrap>;
+  if (game === "slots") return <Wrap><Slots {...gp} /></Wrap>;
+  if (game === "ladder") return <Wrap><CoinLadder {...gp} /></Wrap>;
+  if (game === "memory") return <Wrap><MemoryMatch {...gp} /></Wrap>;
+  if (game === "mines") return <Wrap><Mines {...gp} /></Wrap>;
+  if (game === "plinko") return <Wrap><Plinko {...gp} /></Wrap>;
+  if (game === "limbo") return <Wrap><Limbo {...gp} /></Wrap>;
+  if (game === "reaction") return <Wrap><ReactionTest {...gp} /></Wrap>;
+  if (game === "colormatch") return <Wrap><ColorMatchGame {...gp} /></Wrap>;
+  if (game === "mathrush") return <Wrap><MathRush {...gp} /></Wrap>;
+  if (game === "emojihunt") return <Wrap><EmojiHunt {...gp} /></Wrap>;
+  if (game === "sequence") return <Wrap><SequenceMemory {...gp} /></Wrap>;
+  if (game === "wordscramble") return <Wrap><WordScramble {...gp} /></Wrap>;
+  if (game === "aimtrainer") return <Wrap><AimTrainer {...gp} /></Wrap>;
+  if (game === "typingspeed") return <Wrap><TypingSpeed {...gp} /></Wrap>;
+  if (game === "keno") return <Wrap><Keno {...gp} /></Wrap>;
+
+  return <Wrap>
+    {/* SPLASH */}
+    {splash !== "done" && <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", opacity: splash === "exit" ? 0 : 1, transition: "opacity 0.8s ease-out", pointerEvents: splash === "exit" ? "none" : "auto" }}>
+      <div style={{ textAlign: "center", transform: splash === "exit" ? "translateY(-42vh) scale(0.45)" : "translateY(0) scale(1)", opacity: splash === "exit" ? 0 : 1, transition: "transform 0.9s cubic-bezier(0.34,1.56,0.64,1), opacity 0.7s ease-out" }}>
+        <div style={{ position: "relative", display: "inline-block", marginBottom: 10 }}>
+          <div style={{ fontSize: 42, filter: "drop-shadow(0 0 12px rgba(139,92,246,0.5))" }}>✦</div>
+          <div style={{ position: "absolute", inset: -8, borderRadius: "50%", border: "2px solid rgba(139,92,246,0.45)", boxShadow: "0 0 12px rgba(139,92,246,0.2), inset 0 0 8px rgba(139,92,246,0.1)", animation: "starRotate 8s linear infinite" }} />
+        </div>
+        <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: "clamp(28px,7vw,44px)", fontStyle: "italic", fontWeight: 900, color: "transparent", background: "linear-gradient(135deg,#c084fc,#818cf8,#56c1ff,#c084fc)", backgroundSize: "300% 100%", WebkitBackgroundClip: "text", backgroundClip: "text", animation: "cosmicShimmer 4s ease-in-out infinite", letterSpacing: 1 }}>
+          Flux
+        </h1>
+        <div style={{ width: 60, height: 1, margin: "8px auto 0", background: "linear-gradient(90deg,transparent,rgba(139,92,246,0.4),transparent)" }} />
+        <div style={{ marginTop: 8, fontSize: 10, color: "var(--dim)", opacity: 0.4, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1 }}>{VERSION}</div>
+      </div>
+    </div>}
+    {/* HUB */}
+    <div style={{ maxWidth: isWide ? 780 : 600, margin: "0 auto", padding: isWide ? "24px 24px" : "16px 14px", display: "flex", flexDirection: "column", minHeight: "100vh", justifyContent: "center" }}>
+      <div style={{ textAlign: "center", marginBottom: isWide ? 32 : 24, paddingTop: isWide ? 0 : 16, opacity: hubPhase !== "hidden" ? 1 : 0, transform: hubPhase !== "hidden" ? "translateY(0) scale(1)" : "translateY(-18px) scale(1.1)", transition: "opacity 0.7s ease-out, transform 0.7s cubic-bezier(0.34,1.56,0.64,1)" }}>
+        <div style={{ position: "relative", display: "inline-block", marginBottom: isWide ? 12 : 8 }}>
+          <div style={{ fontSize: isWide ? 48 : 36, filter: "drop-shadow(0 0 10px rgba(139,92,246,0.4))" }}>✦</div>
+          <div style={{ position: "absolute", inset: isWide ? -8 : -6, borderRadius: "50%", border: "2px solid rgba(139,92,246,0.4)", boxShadow: "0 0 10px rgba(139,92,246,0.18), inset 0 0 6px rgba(139,92,246,0.08)", animation: hubPhase !== "hidden" ? "starRotate 8s linear infinite" : "none" }} />
+        </div>
+        <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: isWide ? "clamp(32px,4vw,48px)" : "clamp(24px,5vw,36px)", fontStyle: "italic", fontWeight: 900, marginBottom: 4, color: "transparent", background: "linear-gradient(135deg,#c084fc,#818cf8,#56c1ff,#c084fc)", backgroundSize: "300% 100%", WebkitBackgroundClip: "text", backgroundClip: "text", animation: hubPhase !== "hidden" ? "cosmicShimmer 4s ease-in-out infinite, neonPulse 3s ease-in-out infinite" : "none", letterSpacing: 1 }}>
+          Flux
+        </h1>
+        <div style={{ width: 50, height: 1, margin: "0 auto 10px", background: "linear-gradient(90deg,transparent,rgba(139,92,246,0.3),transparent)" }} />
+        <p style={{ color: "var(--dim)", fontSize: 12, marginBottom: 12, letterSpacing: 0.5 }}>{safeMode ? "9 games · pure skill" : "9 games · always shifting"}</p>
+        {!safeMode && <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+          <Chip amount={chips} />
+          {chips <= 0 && <button onClick={function(){ if (chips < 0) setChips(0); else setChips(10); }} style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: chips < 0 ? "var(--accent)" : "var(--green)", color: "#fff", border: "2px solid " + (chips < 0 ? "var(--accent)" : "var(--green)") }}>{chips < 0 ? "Clear Debt" : "Get 10 Chips"}</button>}
+        </div>}
+      </div>
+      {hubPhase === "cards" && <div key={"grid-" + modeKey} style={{ display: "grid", gridTemplateColumns: isWide ? "repeat(3,1fr)" : "repeat(auto-fill,minmax(148px,1fr))", gap: isWide ? 14 : 10 }}>
+        {GAMES.filter(function(g){ return safeMode ? g.safe : !g.safeOnly; }).map(function(g, i){ return <GameCard key={modeKey + "-" + g.id} game={g} onClick={function(){ setGame(g.id); }} animDelay={reduceAnim ? 50 : i * 100} reduceAnim={reduceAnim} isWide={isWide} />; })}
+      </div>}
+      <div style={{ textAlign: "center", marginTop: 28, padding: 14, color: "var(--dim)", fontSize: 11, opacity: hubPhase === "cards" ? 1 : 0, transition: "opacity 0.5s ease-out 2s" }}>{safeMode ? "All games are skill-based" : "All games use virtual chips · No real money"}</div>
+    </div>
+    {/* SETTINGS GEAR */}
+    {splash === "done" && <button onClick={function(){ setShowSettings(true); }} style={{ position: "fixed", bottom: isWide ? 22 : 18, right: isWide ? 22 : 18, width: isWide ? 50 : 44, height: isWide ? 50 : 44, borderRadius: "50%", background: "var(--surface)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isWide ? 22 : 20, color: "var(--dim)", zIndex: 50, backdropFilter: "blur(8px)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)", opacity: 0.6 }}>⚙️</button>}
+    {/* SETTINGS MODAL */}
+    {showSettings && <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }} onClick={function(e){ if (e.target === e.currentTarget) { setShowSettings(false); setConfirmToggle(null); } }}>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "90%", maxWidth: 340, animation: "fadeUp 0.25s", backdropFilter: "blur(16px)" }}>
+        {confirmToggle === null && <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 900, fontStyle: "italic", color: "var(--text)" }}>⚙️ Settings</h2>
+            <button onClick={function(){ setShowSettings(false); }} style={{ width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          </div>
+          {/* SAFE MODE - instant toggle, no confirm */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 18 }}>🛡️</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>Safe Mode</span>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 }}>Switches to skill-based games. No gambling content shown.</div>
+            </div>
+            <button onClick={function(){ var next = !safeMode; setSafeMode(next); if (next) setGame(null); setModeKey(function(k){ return k + 1; }); }} style={{ width: 48, height: 28, borderRadius: 14, background: safeMode ? "var(--green)" : "var(--surface)", border: safeMode ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 }}>
+              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: safeMode ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }} />
+            </button>
+          </div>
+          {/* REDUCE ANIMATIONS - needs confirm */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 18 }}>🔋</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>Reduce Animations</span>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 }}>Reduces visual effects for older devices. Less fluid but better performance.</div>
+            </div>
+            <button onClick={function(){ setConfirmToggle(reduceAnim ? "reduceOff" : "reduceOn"); }} style={{ width: 48, height: 28, borderRadius: 14, background: reduceAnim ? "var(--neon2)" : "var(--surface)", border: reduceAnim ? "2px solid var(--neon2)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 }}>
+              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: reduceAnim ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }} />
+            </button>
+          </div>
+          <div style={{ marginTop: 16, textAlign: "center", display: "flex", gap: 8, justifyContent: "center" }}>
+            <button onClick={function(){ setShowInfo(true); setShowSettings(false); }} style={{ padding: "10px 20px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)" }}>ℹ️ Credits</button>
+            <button onClick={function(){ setShowSettings(false); }} style={{ padding: "10px 32px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "2px solid #8b5cf6" }}>Done</button>
+          </div>
+          <div style={{ marginTop: 14, textAlign: "center", fontSize: 11, color: "var(--dim)", opacity: 0.5, fontFamily: "'JetBrains Mono',monospace" }}>Flux {VERSION}</div>
+        </>}
+        {confirmToggle !== null && <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>{confirmToggle === "reduceOn" ? "🔋" : "✨"}</div>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)", marginBottom: 8 }}>{confirmToggle === "reduceOn" ? "Reduce Animations?" : "Restore Animations?"}</div>
+          <p style={{ fontSize: 13, color: "var(--dim)", lineHeight: 1.5, marginBottom: 20 }}>{confirmToggle === "reduceOn" ? "This will reduce background effects, card transitions, and visual flair. Recommended for older or slower devices." : "This will restore all animations, background effects, and visual transitions. May use more device resources."}</p>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <button onClick={function(){ setConfirmToggle(null); }} style={{ padding: "10px 24px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "2px solid var(--border)" }}>Cancel</button>
+            <button onClick={function(){ setReduceAnim(confirmToggle === "reduceOn"); setConfirmToggle(null); }} style={{ padding: "10px 24px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: confirmToggle === "reduceOn" ? "var(--neon2)" : "var(--green)", color: "#fff", border: "2px solid " + (confirmToggle === "reduceOn" ? "var(--neon2)" : "var(--green)") }}>Yes, {confirmToggle === "reduceOn" ? "Reduce" : "Restore"}</button>
+          </div>
+        </div>}
+      </div>
+    </div>}
+    {showInfo && <InfoPanel onClose={function(){ setShowInfo(false); }} />}
+    {debtPopup && <DebtPopup onDebt={function(){ debtPopup.onDebt(); setDebtPopup(null); }} onAfford={function(){ debtPopup.onAfford(); setDebtPopup(null); }} onCancel={function(){ setDebtPopup(null); }} />}
+  </Wrap>;
+}
+
+function Wrap({ children }) {
+  return <div style={{ minHeight: "100vh", minWidth: "100vw", background: "#050508", color: "var(--text)", fontFamily: "'Outfit',sans-serif", position: "relative", overflow: "hidden" }}>
+    <link href={FONTS_URL} rel="stylesheet" />
+    <style>{CSS}</style>
+    <Starfield />
+    <div style={{ position: "relative", zIndex: 1 }}>{children}</div>
+  </div>;
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<FluxApp />);
+document.getElementById("loading").classList.add("hide");
+setTimeout(function() { var el = document.getElementById("loading"); if (el) el.remove(); }, 600);
+  </script>
+</body>
+</html>
