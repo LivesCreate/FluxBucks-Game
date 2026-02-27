@@ -13,7 +13,7 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body,#root{width:100%;height:100%;overflow-x:hidden;background:#050508}
+html,body,#root{width:100%;height:100%;overflow-x:hidden;background:#050508;color:#e0e0e8}
 html{-webkit-text-size-adjust:100%;touch-action:manipulation}
 body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;position:fixed;inset:0;overflow:auto}
 #root{min-height:100vh;min-height:100dvh}
@@ -25,13 +25,29 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 input[type="range"]{-webkit-appearance:none;height:6px;border-radius:3px;background:#2a2a40}
 input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.3)}
 @supports(padding: env(safe-area-inset-bottom)){body{padding-bottom:env(safe-area-inset-bottom);padding-top:env(safe-area-inset-top)}}
+#flux-loader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#050508;z-index:9999;font-family:system-ui,sans-serif}
+#flux-loader div{text-align:center}
+#flux-loader .icon{font-size:42px;margin-bottom:12px}
+#flux-loader .ver{font-size:11px;color:#666;margin-top:8px;font-family:monospace}
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root">
+  <div id="flux-loader"><div><div class="icon">✦</div><div class="ver">Loading...</div></div></div>
+</div>
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    for(var i=0;i<regs.length;i++) regs[i].unregister();
+  });
+}
+</script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script>
+if(typeof React==='undefined'||typeof ReactDOM==='undefined'){
+  document.getElementById('flux-loader').innerHTML='<div><div class="icon">⚠️</div><div style="color:#ff5e78;font-weight:700;margin-bottom:8px">Failed to load</div><div style="color:#888;font-size:13px;max-width:280px">React CDN could not be reached.<br>Check your internet connection and reload.</div><div style="margin-top:16px"><button onclick="location.reload()" style="padding:10px 24px;border-radius:10px;background:#8b5cf6;color:#fff;font-weight:700;border:none;cursor:pointer">Reload</button></div></div>';
+}else{
 const {
   useState,
   useEffect,
@@ -43,7 +59,7 @@ const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const uid = () => Math.random().toString(36).slice(2, 9);
-const delay = t => new Promise(r => setTimeout(r, Math.max(10, t / (window.__fluxAnimSpeed || 1))));
+const delay = t => new Promise(r => setTimeout(r, Math.max(10, t)));
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const SUITS = ["♠", "♥", "♦", "♣"];
 const SUIT_NAMES = {
@@ -140,8 +156,15 @@ const CSS = `
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 @keyframes reelDrop{from{transform:translateY(-14px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes staggerPop{0%{opacity:0;transform:scale(0.3) translateY(35px)}50%{transform:scale(1.16) translateY(-8px)}75%{transform:scale(0.95) translateY(2px)}100%{opacity:1;transform:scale(1) translateY(0)}}
-@keyframes toastSlideIn{0%{opacity:0;transform:translateX(100%) scale(0.8)}100%{opacity:1;transform:translateX(0) scale(1)}}
-@keyframes toastSlideOut{0%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(100%)}}
+@keyframes toastSlideInBR{0%{opacity:0;transform:translateX(100%) scale(0.8)}100%{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes toastSlideOutBR{0%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(100%)}}
+@keyframes toastSlideInBL{0%{opacity:0;transform:translateX(-100%) scale(0.8)}100%{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes toastSlideOutBL{0%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(-100%)}}
+@keyframes toastSlideInTR{0%{opacity:0;transform:translateY(-100%) scale(0.8)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes toastSlideOutTR{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-100%)}}
+@keyframes toastSlideInTL{0%{opacity:0;transform:translate(-100%,-30%) scale(0.8)}100%{opacity:1;transform:translate(0) scale(1)}}
+@keyframes toastSlideOutTL{0%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(-100%)}}
+@keyframes toastPop{0%{opacity:0;transform:scale(0.7)}60%{opacity:1;transform:scale(1.04)}100%{opacity:1;transform:scale(1)}}
 @keyframes achieveGlow{0%{box-shadow:0 0 8px rgba(255,207,86,0.3)}50%{box-shadow:0 0 24px rgba(255,207,86,0.6)}100%{box-shadow:0 0 8px rgba(255,207,86,0.3)}}
 @keyframes countUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 button{font-family:'Outfit',sans-serif;cursor:pointer;border:none;transition:all 0.22s cubic-bezier(0.34,1.56,0.64,1)}
@@ -156,8 +179,8 @@ var SAVE_KEY = "flux_save_v3";
 var DEFAULT_SAVE = {
   chips: 500,
   safeMode: false,
-  reduceAnim: false,
-  animSpeed: 1,
+  toastPos: "bottom-right",
+  username: "",
   achievements: [],
   betHistory: [],
   stats: {
@@ -402,11 +425,60 @@ var ACHIEVEMENTS = [{
   hint: "Match all 10 picks in Keno",
   tier: "platinum"
 }, {
+  id: "crash_10x",
+  name: "Diamond Hands",
+  desc: "Cash out at 10x+ in Crash",
+  icon: "💎",
+  hint: "Hold past 10x and cash out",
+  tier: "gold"
+}, {
+  id: "crash_50x",
+  name: "To the Moon",
+  desc: "Cash out at 50x+ in Crash",
+  icon: "🚀",
+  hint: "Hold past 50x and cash out",
+  tier: "platinum"
+}, {
+  id: "tower_clear",
+  name: "Tower Master",
+  desc: "Clear all 8 floors in Tower",
+  icon: "🗼",
+  hint: "Reach the top of the tower",
+  tier: "gold"
+}, {
+  id: "wheel_10x",
+  name: "Jackpot Spin",
+  desc: "Hit 10x on the Wheel",
+  icon: "🎡",
+  hint: "Land on the 10x segment",
+  tier: "gold"
+}, {
+  id: "flip_streak_5",
+  name: "Lucky Coin",
+  desc: "Win 5 coin flips in a row",
+  icon: "🪙",
+  hint: "Guess correctly 5 times consecutively",
+  tier: "silver"
+}, {
   id: "plinko_edge",
   name: "Edge Runner",
   desc: "Hit the highest Plinko multiplier",
   icon: "📍",
   hint: "Land on the maximum edge slot",
+  tier: "gold"
+}, {
+  id: "vp_royal",
+  name: "Royal Flush",
+  desc: "Hit a Royal Flush in Video Poker",
+  icon: "👑",
+  hint: "Get A-K-Q-J-10 of the same suit",
+  tier: "platinum"
+}, {
+  id: "bac_tie",
+  name: "Three-Way Draw",
+  desc: "Win a Tie bet in Baccarat",
+  icon: "🤝",
+  hint: "Bet on tie and have it hit",
   tier: "gold"
 }, {
   id: "ladder_5",
@@ -489,7 +561,14 @@ function checkAchievements(save, event) {
   if (event.game === "memory" && event.perfectRound) add("memory_perfect");
   if (event.game === "keno" && event.hits === 10) add("keno_10");
   if (event.game === "plinko" && event.hitMax) add("plinko_edge");
+  if (event.game === "videopoker" && event.mult === 250) add("vp_royal");
+  if (event.game === "baccarat" && event.type === "win" && event.betSide === "tie") add("bac_tie");
   if (event.game === "ladder" && event.rung >= 5) add("ladder_5");
+  if (event.game === "crash" && event.mult >= 10) add("crash_10x");
+  if (event.game === "crash" && event.mult >= 50) add("crash_50x");
+  if (event.game === "tower" && event.mult >= 30) add("tower_clear");
+  if (event.game === "wheel" && event.mult >= 10) add("wheel_10x");
+  if (event.game === "coinflip" && s.currentWinStreak >= 5) add("flip_streak_5");
   if (event.safeMode) add("safe_mode");
   if (s.totalWagered >= 1000) add("wagered_1k");
   if (s.totalWagered >= 10000) add("wagered_10k");
@@ -497,34 +576,83 @@ function checkAchievements(save, event) {
 }
 
 /* ═══════════ ACHIEVEMENT TOAST ══════════════════════════════════ */
-function AchievementToast({
-  achievement,
-  onDone
+function AchievementToastStack({
+  toasts,
+  onDismiss,
+  pos
 }) {
-  var [exiting, setExiting] = useState(false);
+  var p = pos || "bottom-right";
+  var isBottom = p === "bottom-right" || p === "bottom-left";
+  var isRight = p === "bottom-right" || p === "top-right";
+  var baseStyle = {};
+  if (isBottom) baseStyle.bottom = 24;else baseStyle.top = 24;
+  if (isRight) baseStyle.right = 24;else baseStyle.left = 24;
+  return /*#__PURE__*/React.createElement("div", {
+    style: Object.assign({}, baseStyle, {
+      position: "fixed",
+      zIndex: 500,
+      display: "flex",
+      flexDirection: isBottom ? "column-reverse" : "column",
+      gap: 8,
+      pointerEvents: "none"
+    })
+  }, toasts.map(function (toast, i) {
+    return /*#__PURE__*/React.createElement(AchievementToastItem, {
+      key: toast.queueId,
+      achievement: toast.id,
+      onDone: function () {
+        onDismiss(toast.queueId);
+      },
+      pos: pos,
+      index: i,
+      total: toasts.length
+    });
+  }));
+}
+function AchievementToastItem({
+  achievement,
+  onDone,
+  pos,
+  index,
+  total
+}) {
+  var [phase, setPhase] = useState("enter");
   var def = ACHIEVEMENTS.find(function (a) {
     return a.id === achievement;
   });
-  if (!def) return null;
   useEffect(function () {
+    if (!def) {
+      onDone();
+      return;
+    }
     var t1 = setTimeout(function () {
-      setExiting(true);
-    }, 4000);
+      setPhase("exit");
+    }, 4500);
     var t2 = setTimeout(function () {
       onDone();
-    }, 4600);
+    }, 5100);
     return function () {
       clearTimeout(t1);
       clearTimeout(t2);
     };
   }, []);
+  if (!def) return null;
+  var p = pos || "bottom-right";
+  var isRight = p === "bottom-right" || p === "top-right";
+  var slideDir = isRight ? "translateX(120%)" : "translateX(-120%)";
+  var transform = "translateX(0)";
+  var opacity = 1;
+  var transition = "transform 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease-out";
+  if (phase === "exit") {
+    transform = slideDir;
+    opacity = 0;
+    transition = "transform 0.4s ease-in, opacity 0.3s ease-in";
+  }
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      position: "fixed",
-      bottom: 24,
-      right: 24,
-      zIndex: 500,
-      animation: exiting ? "toastSlideOut 0.5s ease-in forwards" : "toastSlideIn 0.5s cubic-bezier(0.34,1.56,0.64,1)",
+      transform: transform,
+      opacity: opacity,
+      transition: transition,
       display: "flex",
       alignItems: "center",
       gap: 12,
@@ -534,12 +662,14 @@ function AchievementToast({
       borderRadius: 14,
       boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 16px " + TIER_COLORS[def.tier] + "44",
       backdropFilter: "blur(12px)",
-      maxWidth: 320
+      maxWidth: 320,
+      pointerEvents: "auto",
+      animation: phase === "enter" ? "toastPop 0.5s cubic-bezier(0.34,1.56,0.64,1)" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 32,
-      animation: "popBounce 0.5s"
+      animation: phase === "enter" ? "popBounce 0.5s" : "none"
     }
   }, def.icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -719,6 +849,7 @@ function StatsPage({
   betHistory,
   achievements,
   chips,
+  username,
   onClose
 }) {
   var s = stats || DEFAULT_SAVE.stats;
@@ -766,7 +897,7 @@ function StatsPage({
       fontStyle: "italic",
       color: "var(--text)"
     }
-  }, "\uD83D\uDCCA Statistics"), /*#__PURE__*/React.createElement("button", {
+  }, "📊 Statistics"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
       width: 32,
@@ -780,7 +911,16 @@ function StatsPage({
       alignItems: "center",
       justifyContent: "center"
     }
-  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+  }, "✕")), username && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginBottom: 12,
+      fontSize: 14,
+      fontWeight: 700,
+      color: "var(--neon)",
+      fontFamily: "'JetBrains Mono',monospace"
+    }
+  }, "👤 " + username), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
@@ -1026,7 +1166,8 @@ function StatsPage({
     id: "copyStatsBtn",
     onClick: function () {
       if (navigator.clipboard) {
-        var txt = "--- Flux Stats ---\n" + "Games: " + s.gamesPlayed + " | Win Rate: " + winRate + "%\n" + "Chips: " + chips + " | Net: " + (netProfit >= 0 ? "+" : "") + netProfit + "\n" + "Best Win: " + s.biggestWin + " | Streak: " + s.longestWinStreak + "\n" + "Achievements: " + (achievements || []).length + "/" + ACHIEVEMENTS.length;
+        var header = username ? "--- " + username + "'s Flux Stats ---\n" : "--- Flux Stats ---\n";
+        var txt = header + "Games: " + s.gamesPlayed + " | Win Rate: " + winRate + "%\n" + "Chips: " + chips + " | Net: " + (netProfit >= 0 ? "+" : "") + netProfit + "\n" + "Best Win: " + s.biggestWin + " | Streak: " + s.longestWinStreak + "\n" + "Achievements: " + (achievements || []).length + "/" + ACHIEVEMENTS.length;
         navigator.clipboard.writeText(txt).then(function () {
           var btn = document.getElementById("copyStatsBtn");
           if (btn) {
@@ -1295,7 +1436,7 @@ function Starfield() {
       ctx.globalAlpha = 1;
 
       // === DRAW PLANETS (scrolling, faint, realistic slow drift) ===
-      const isReduced = !!window.__neonReduceAnim;
+      const isReduced = false;
       planetTimer++;
       if (planetTimer > 800 + Math.random() * 1200) {
         if (planets.length < 6) spawnPlanet(false);
@@ -1698,7 +1839,8 @@ function GameBtn({
   onClick,
   color,
   disabled,
-  icon
+  icon,
+  text
 }) {
   const c = color || "var(--neon)";
   function handleClick(e) {
@@ -1726,7 +1868,7 @@ function GameBtn({
     style: {
       fontSize: 20
     }
-  }, icon), children);
+  }, icon), text || children);
 }
 function PlayingCard({
   card,
@@ -1827,10 +1969,12 @@ function CardLabel({
 function ResultBanner({
   text,
   type,
-  show
+  show,
+  win
 }) {
-  if (!show || !text) return null;
-  const w = type === "win";
+  if (!text) return null;
+  if (show === false) return null;
+  const w = type === "win" || win === true;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
@@ -3016,11 +3160,11 @@ function Slots({
     let w = 0,
       txt = "";
     if (a === b && b === c) {
-      w = Math.floor((SLOT_PAY[a] || 10) * bet / 10);
-      txt = "Triple! +" + w;
+      w = Math.floor((SLOT_PAY[a] || 10) * bet);
+      txt = "JACKPOT! +" + w;
     } else if (a === b || b === c || a === c) {
       const m = a === b ? a : a === c ? a : b;
-      w = Math.floor((SLOT_PAY[m] || 5) * bet / 30);
+      w = Math.floor((SLOT_PAY[m] || 5) / 5 * bet);
       txt = "Pair! +" + w;
     }
     if (w > 0) {
@@ -7101,6 +7245,1408 @@ function Keno({
     title: "Keno Guide"
   }));
 }
+
+/* ═══ GAME: CRASH ════════════════════════════════════════════════ */
+var CR_G = [{
+  t: "How Crash Works",
+  d: "A multiplier starts at 1.00x and rises quickly. Cash out before it crashes to win your bet times the multiplier."
+}, {
+  t: "Crash Point",
+  d: "The crash point is determined before the round starts. It could crash at 1.01x or go past 100x."
+}, {
+  t: "Cash Out",
+  d: "Click Cash Out anytime to lock in your winnings. If the multiplier crashes before you cash out, you lose your bet."
+}, {
+  t: "Strategy",
+  d: "Low targets (2-3x) hit often. High targets (10x+) are rare but pay big. Don't get greedy."
+}];
+function Crash({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [phase, setPhase] = useState("idle");
+  var [mult, setMult] = useState(1);
+  var [crashAt, setCrashAt] = useState(0);
+  var [result, setResult] = useState(null);
+  var frameRef = useRef(null);
+  var startRef = useRef(0);
+  function genCrash() {
+    if (window.__fluxForceWin) return 5 + Math.random() * 20;
+    var r = Math.random();
+    return Math.max(1.01, 1 / (1 - r) * 0.97);
+  }
+  function startRound() {
+    if (phase !== "idle") return;
+    function doIt() {
+      doStart();
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doStart();
+  }
+  function doStart() {
+    var cp = genCrash();
+    setCrashAt(cp);
+    setResult(null);
+    setMult(1);
+    setPhase("rising");
+    startRef.current = performance.now();
+    function tick(now) {
+      var elapsed = (now - startRef.current) / 1000;
+      var m = Math.pow(Math.E, elapsed * 0.6);
+      if (m >= cp) {
+        setMult(parseFloat(cp.toFixed(2)));
+        setPhase("crashed");
+        setChips(function (c) {
+          return c - bet;
+        });
+        setResult({
+          type: "lose",
+          text: "Crashed at " + cp.toFixed(2) + "x! -" + bet
+        });
+        if (trackResult) trackResult({
+          type: "lose",
+          game: "crash",
+          bet: bet,
+          profit: -bet
+        });
+        return;
+      }
+      setMult(parseFloat(m.toFixed(2)));
+      frameRef.current = requestAnimationFrame(tick);
+    }
+    frameRef.current = requestAnimationFrame(tick);
+  }
+  function cashOut() {
+    if (phase !== "rising") return;
+    cancelAnimationFrame(frameRef.current);
+    var profit = Math.floor(bet * mult) - bet;
+    setPhase("cashed");
+    setChips(function (c) {
+      return c + profit;
+    });
+    setResult({
+      type: "win",
+      text: "Cashed at " + mult.toFixed(2) + "x! +" + profit
+    });
+    if (trackResult) trackResult({
+      type: "win",
+      game: "crash",
+      bet: bet,
+      profit: profit,
+      mult: mult
+    });
+  }
+  useEffect(function () {
+    return function () {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    };
+  }, []);
+  var color = phase === "crashed" ? "var(--accent)" : phase === "cashed" ? "var(--green)" : mult > 3 ? "#fbbf24" : "var(--neon2)";
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "📈 Crash",
+    titleColor: "#fbbf24",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 160,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "var(--surface2)",
+      borderRadius: 14,
+      border: "1px solid var(--border)",
+      marginBottom: 16,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: Math.min(100, (mult - 1) * 20) + "%",
+      background: phase === "crashed" ? "rgba(255,94,120,0.15)" : "rgba(251,191,36,0.1)",
+      transition: "height 0.1s"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 52,
+      fontWeight: 900,
+      fontFamily: "'JetBrains Mono',monospace",
+      color: color,
+      textShadow: "0 0 20px " + color + "44",
+      position: "relative",
+      zIndex: 1
+    }
+  }, mult.toFixed(2), "x"), phase === "crashed" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      bottom: 12,
+      fontSize: 14,
+      fontWeight: 700,
+      color: "var(--accent)"
+    }
+  }, "CRASHED!")), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    win: result.type === "win",
+    text: result.text
+  }), /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center",
+      marginTop: 10
+    }
+  }, phase === "idle" || phase === "crashed" || phase === "cashed" ? /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#fbbf24",
+    text: "Start Round",
+    onClick: startRound
+  }) : null, phase === "rising" ? /*#__PURE__*/React.createElement(GameBtn, {
+    color: "var(--green)",
+    text: "Cash Out " + mult.toFixed(2) + "x",
+    onClick: cashOut
+  }) : null)), /*#__PURE__*/React.createElement(GameGuide, {
+    items: CR_G,
+    title: "Crash Guide"
+  }));
+}
+
+/* ═══ GAME: WHEEL ════════════════════════════════════════════════ */
+var WH_SEGS = [{
+  label: "0x",
+  mult: 0,
+  color: "#e74c3c",
+  weight: 3
+}, {
+  label: "1.2x",
+  mult: 1.2,
+  color: "#3498db",
+  weight: 5
+}, {
+  label: "1.5x",
+  mult: 1.5,
+  color: "#2ecc71",
+  weight: 4
+}, {
+  label: "2x",
+  mult: 2,
+  color: "#9b59b6",
+  weight: 3
+}, {
+  label: "0x",
+  mult: 0,
+  color: "#e74c3c",
+  weight: 3
+}, {
+  label: "1.5x",
+  mult: 1.5,
+  color: "#2ecc71",
+  weight: 4
+}, {
+  label: "3x",
+  mult: 3,
+  color: "#f39c12",
+  weight: 2
+}, {
+  label: "1.2x",
+  mult: 1.2,
+  color: "#3498db",
+  weight: 5
+}, {
+  label: "5x",
+  mult: 5,
+  color: "#e67e22",
+  weight: 1
+}, {
+  label: "0x",
+  mult: 0,
+  color: "#e74c3c",
+  weight: 3
+}, {
+  label: "2x",
+  mult: 2,
+  color: "#9b59b6",
+  weight: 3
+}, {
+  label: "10x",
+  mult: 10,
+  color: "#fbbf24",
+  weight: 0.5
+}, {
+  label: "1.5x",
+  mult: 1.5,
+  color: "#2ecc71",
+  weight: 4
+}, {
+  label: "1.2x",
+  mult: 1.2,
+  color: "#3498db",
+  weight: 5
+}, {
+  label: "3x",
+  mult: 3,
+  color: "#f39c12",
+  weight: 2
+}, {
+  label: "0x",
+  mult: 0,
+  color: "#e74c3c",
+  weight: 3
+}];
+var WH_G = [{
+  t: "Spin the Wheel",
+  d: "Place your bet and spin. The wheel lands on a random segment with a multiplier."
+}, {
+  t: "Multipliers",
+  d: "Segments include 0x (lose), 1.2x, 1.5x, 2x, 3x, 5x, and a rare 10x jackpot segment."
+}, {
+  t: "Odds",
+  d: "More common multipliers appear on larger segments. Higher payouts are rarer."
+}];
+function Wheel({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [spinning, setSpinning] = useState(false);
+  var [rotation, setRotation] = useState(0);
+  var [result, setResult] = useState(null);
+  var [landed, setLanded] = useState(null);
+  function weightedPick() {
+    if (window.__fluxForceWin) {
+      var winners = WH_SEGS.map(function (s, i) {
+        return {
+          s: s,
+          i: i
+        };
+      }).filter(function (x) {
+        return x.s.mult >= 2;
+      });
+      var w = winners[Math.floor(Math.random() * winners.length)];
+      return w.i;
+    }
+    var totalW = 0;
+    for (var i = 0; i < WH_SEGS.length; i++) totalW += WH_SEGS[i].weight;
+    var r = Math.random() * totalW;
+    var acc = 0;
+    for (var j = 0; j < WH_SEGS.length; j++) {
+      acc += WH_SEGS[j].weight;
+      if (r <= acc) return j;
+    }
+    return 0;
+  }
+  function spin() {
+    if (spinning) return;
+    function doIt() {
+      doSpin();
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doSpin();
+  }
+  function doSpin() {
+    setSpinning(true);
+    setResult(null);
+    setLanded(null);
+    var idx = weightedPick();
+    var seg = WH_SEGS[idx];
+    var segAngle = 360 / WH_SEGS.length;
+    var targetAngle = 360 - (idx * segAngle + segAngle / 2);
+    var fullSpins = 1800 + Math.random() * 720;
+    var finalRot = fullSpins + targetAngle;
+    setRotation(function (prev) {
+      return prev + finalRot;
+    });
+    setTimeout(function () {
+      setLanded(seg);
+      setSpinning(false);
+      if (seg.mult === 0) {
+        setChips(function (c) {
+          return c - bet;
+        });
+        setResult({
+          type: "lose",
+          text: "0x — Lost " + bet
+        });
+        if (trackResult) trackResult({
+          type: "lose",
+          game: "wheel",
+          bet: bet,
+          profit: -bet
+        });
+      } else {
+        var profit = Math.floor(bet * seg.mult) - bet;
+        setChips(function (c) {
+          return c + profit;
+        });
+        if (profit > 0) {
+          setResult({
+            type: "win",
+            text: seg.label + " — Won " + profit + "!"
+          });
+          if (trackResult) trackResult({
+            type: "win",
+            game: "wheel",
+            bet: bet,
+            profit: profit,
+            mult: seg.mult
+          });
+        } else {
+          setResult({
+            type: "win",
+            text: seg.label + " — Break even!"
+          });
+        }
+      }
+    }, 4200);
+  }
+  var segAngle = 360 / WH_SEGS.length;
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "🎡 Wheel",
+    titleColor: "#f39c12",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      width: 220,
+      height: 220,
+      margin: "0 auto 16px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -14,
+      left: "50%",
+      transform: "translateX(-50%)",
+      fontSize: 22,
+      zIndex: 2,
+      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))"
+    }
+  }, "▼"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 220,
+      height: 220,
+      borderRadius: "50%",
+      border: "4px solid var(--border)",
+      overflow: "hidden",
+      transform: "rotate(" + rotation + "deg)",
+      transition: spinning ? "transform 4s cubic-bezier(0.2,0.8,0.3,1)" : "none",
+      position: "relative"
+    }
+  }, WH_SEGS.map(function (seg, i) {
+    var startAngle = i * segAngle;
+    var midAngle = startAngle + segAngle / 2;
+    var rad = midAngle * Math.PI / 180;
+    var tx = 50 + Math.sin(rad) * 36;
+    var ty = 50 - Math.cos(rad) * 36;
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        position: "absolute",
+        width: "100%",
+        height: "100%",
+        background: "conic-gradient(from " + startAngle + "deg, " + seg.color + " 0deg, " + seg.color + " " + segAngle + "deg, transparent " + segAngle + "deg)",
+        opacity: 0.85
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "absolute",
+        left: tx + "%",
+        top: ty + "%",
+        transform: "translate(-50%,-50%) rotate(" + -rotation + "deg)",
+        fontSize: 9,
+        fontWeight: 700,
+        color: "#fff",
+        textShadow: "0 1px 3px rgba(0,0,0,0.7)",
+        pointerEvents: "none",
+        transition: spinning ? "transform 4s cubic-bezier(0.2,0.8,0.3,1)" : "none"
+      }
+    }, seg.label));
+  }))), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    win: result.type === "win",
+    text: result.text
+  }), /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#f39c12",
+    text: spinning ? "Spinning..." : "Spin!",
+    onClick: spin,
+    disabled: spinning
+  })), /*#__PURE__*/React.createElement(GameGuide, {
+    items: WH_G,
+    title: "Wheel Guide"
+  }));
+}
+
+/* ═══ GAME: TOWER ════════════════════════════════════════════════ */
+var TW_G = [{
+  t: "Climb the Tower",
+  d: "Each floor has 3 doors. One is safe, the others hide traps. Pick the right door to climb higher."
+}, {
+  t: "Multiplier",
+  d: "Each safe floor increases your multiplier. The higher you go, the bigger the payout."
+}, {
+  t: "Cash Out",
+  d: "Cash out anytime after clearing a floor to lock in your winnings."
+}, {
+  t: "Risk",
+  d: "Hit a trap and you lose your entire bet. 8 floors total — clearing all 8 gives a massive payout."
+}];
+function Tower({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [phase, setPhase] = useState("idle");
+  var [floor, setFloor] = useState(0);
+  var [safes, setSafes] = useState([]);
+  var [revealed, setRevealed] = useState([]);
+  var [result, setResult] = useState(null);
+  var FLOORS = 8;
+  var COLS = 3;
+  var MULTS = [1, 1.4, 2, 3, 4.5, 7, 11, 17, 30];
+  function startGame() {
+    if (phase !== "idle") return;
+    function doIt() {
+      doStart();
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doStart();
+  }
+  function doStart() {
+    var s = [];
+    for (var i = 0; i < FLOORS; i++) {
+      if (window.__fluxForceWin) {
+        s.push(0);
+      } else {
+        s.push(Math.floor(Math.random() * COLS));
+      }
+    }
+    setSafes(s);
+    setRevealed([]);
+    setFloor(0);
+    setResult(null);
+    setPhase("playing");
+  }
+  function pickDoor(col) {
+    if (phase !== "playing") return;
+    if (floor >= FLOORS) return;
+    var isSafe = safes[floor] === col;
+    var newRevealed = revealed.concat([{
+      floor: floor,
+      col: col,
+      safe: isSafe
+    }]);
+    setRevealed(newRevealed);
+    if (isSafe) {
+      var nextFloor = floor + 1;
+      setFloor(nextFloor);
+      if (nextFloor >= FLOORS) {
+        var profit = Math.floor(bet * MULTS[FLOORS]) - bet;
+        setPhase("idle");
+        setChips(function (c) {
+          return c + profit;
+        });
+        setResult({
+          type: "win",
+          text: "Cleared the tower! " + MULTS[FLOORS] + "x = +" + profit
+        });
+        if (trackResult) trackResult({
+          type: "win",
+          game: "tower",
+          bet: bet,
+          profit: profit,
+          mult: MULTS[FLOORS]
+        });
+      }
+    } else {
+      setPhase("dead");
+      setChips(function (c) {
+        return c - bet;
+      });
+      setResult({
+        type: "lose",
+        text: "Hit a trap on floor " + (floor + 1) + "! -" + bet
+      });
+      if (trackResult) trackResult({
+        type: "lose",
+        game: "tower",
+        bet: bet,
+        profit: -bet
+      });
+    }
+  }
+  function cashOutTower() {
+    if (phase !== "playing" || floor === 0) return;
+    var profit = Math.floor(bet * MULTS[floor]) - bet;
+    setPhase("idle");
+    setChips(function (c) {
+      return c + profit;
+    });
+    setResult({
+      type: "win",
+      text: "Cashed at floor " + floor + "! " + MULTS[floor] + "x = +" + profit
+    });
+    if (trackResult) trackResult({
+      type: "win",
+      game: "tower",
+      bet: bet,
+      profit: profit,
+      mult: MULTS[floor]
+    });
+  }
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "🗼 Tower",
+    titleColor: "#e67e22",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12,
+      fontSize: 18,
+      fontWeight: 900,
+      fontFamily: "'JetBrains Mono',monospace",
+      color: floor > 0 ? "var(--neon2)" : "var(--dim)"
+    }
+  }, phase === "playing" || phase === "dead" ? MULTS[floor] + "x" : "—"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column-reverse",
+      gap: 4,
+      maxWidth: 280,
+      margin: "0 auto 14px"
+    }
+  }, Array.from({
+    length: FLOORS
+  }).map(function (_, fi) {
+    var isCurrentFloor = fi === floor && phase === "playing";
+    var floorRevealed = revealed.filter(function (r) {
+      return r.floor === fi;
+    });
+    var floorDone = floorRevealed.length > 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: fi,
+      style: {
+        display: "flex",
+        gap: 4,
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 28,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 10,
+        fontWeight: 700,
+        color: isCurrentFloor ? "var(--neon2)" : "var(--dim)",
+        fontFamily: "'JetBrains Mono',monospace"
+      }
+    }, MULTS[fi + 1] ? MULTS[fi + 1] + "x" : "🏆"), Array.from({
+      length: COLS
+    }).map(function (_, ci) {
+      var rev = floorRevealed.find(function (r) {
+        return r.col === ci;
+      });
+      var isSafe = safes[fi] === ci;
+      var showSafe = phase === "dead" && fi === floor || rev;
+      var bg = "var(--surface2)";
+      if (rev && rev.safe) bg = "rgba(74,222,128,0.25)";
+      if (rev && !rev.safe) bg = "rgba(255,94,120,0.25)";
+      if (phase === "dead" && fi === floor && isSafe && !rev) bg = "rgba(74,222,128,0.15)";
+      var borderC = rev ? rev.safe ? "var(--green)" : "var(--accent)" : isCurrentFloor ? "var(--neon2)" : "var(--border)";
+      return /*#__PURE__*/React.createElement("button", {
+        key: ci,
+        onClick: function () {
+          pickDoor(ci);
+        },
+        disabled: !isCurrentFloor,
+        style: {
+          flex: 1,
+          height: 38,
+          borderRadius: 8,
+          background: bg,
+          border: "2px solid " + borderC,
+          cursor: isCurrentFloor ? "pointer" : "default",
+          opacity: fi > floor && phase === "playing" ? 0.4 : 1,
+          transition: "all 0.2s",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 16
+        }
+      }, rev ? rev.safe ? "✓" : "💀" : phase === "dead" && fi === floor && isSafe ? "✓" : fi < floor ? "✓" : "");
+    }));
+  })), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    win: result.type === "win",
+    text: result.text
+  }), phase === "idle" || phase === "dead" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#e67e22",
+    text: "Start Climb",
+    onClick: startGame
+  })) : null, phase === "playing" && floor > 0 ? /*#__PURE__*/React.createElement(GameBtn, {
+    color: "var(--green)",
+    text: "Cash Out " + MULTS[floor] + "x",
+    onClick: cashOutTower
+  }) : null), /*#__PURE__*/React.createElement(GameGuide, {
+    items: TW_G,
+    title: "Tower Guide"
+  }));
+}
+
+/* ═══ GAME: COIN FLIP ════════════════════════════════════════════ */
+var CF_G = [{
+  t: "Pick a Side",
+  d: "Choose Heads or Tails before the flip. Simple 50/50 odds."
+}, {
+  t: "Payout",
+  d: "Correct guess pays 1.9x your bet. The 5% edge keeps the house lights on."
+}, {
+  t: "Streaks",
+  d: "Past flips don't affect future ones. Each flip is independent."
+}];
+function CoinFlip({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [flipping, setFlipping] = useState(false);
+  var [result, setResult] = useState(null);
+  var [coinFace, setCoinFace] = useState(null);
+  var [history, setHistory] = useState([]);
+  function flip(choice) {
+    if (flipping) return;
+    function doIt() {
+      doFlip(choice);
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doFlip(choice);
+  }
+  function doFlip(choice) {
+    setFlipping(true);
+    setResult(null);
+    setCoinFace(null);
+    var outcome;
+    if (window.__fluxForceWin) {
+      outcome = choice;
+    } else {
+      outcome = Math.random() < 0.5 ? "heads" : "tails";
+    }
+    setTimeout(function () {
+      setCoinFace(outcome);
+      setHistory(function (h) {
+        return [outcome].concat(h).slice(0, 20);
+      });
+      var won = choice === outcome;
+      if (won) {
+        var profit = Math.floor(bet * 0.9);
+        setChips(function (c) {
+          return c + profit;
+        });
+        setResult({
+          type: "win",
+          text: (outcome === "heads" ? "🪙 Heads" : "⭐ Tails") + "! +" + profit
+        });
+        if (trackResult) trackResult({
+          type: "win",
+          game: "coinflip",
+          bet: bet,
+          profit: profit
+        });
+      } else {
+        setChips(function (c) {
+          return c - bet;
+        });
+        setResult({
+          type: "lose",
+          text: (outcome === "heads" ? "🪙 Heads" : "⭐ Tails") + "! -" + bet
+        });
+        if (trackResult) trackResult({
+          type: "lose",
+          game: "coinflip",
+          bet: bet,
+          profit: -bet
+        });
+      }
+      setFlipping(false);
+    }, 900);
+  }
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "🪙 Coin Flip",
+    titleColor: "var(--neon2)",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 120,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 90,
+      height: 90,
+      borderRadius: "50%",
+      background: flipping ? "linear-gradient(135deg,#fbbf24,#c084fc)" : coinFace === "heads" ? "linear-gradient(135deg,#fbbf24,#f59e0b)" : coinFace === "tails" ? "linear-gradient(135deg,#8b5cf6,#6366f1)" : "var(--surface2)",
+      border: "3px solid " + (coinFace === "heads" ? "#fbbf24" : coinFace === "tails" ? "#8b5cf6" : "var(--border)"),
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 36,
+      animation: flipping ? "popBounce 0.9s infinite" : "none",
+      boxShadow: coinFace ? "0 0 24px " + (coinFace === "heads" ? "rgba(251,191,36,0.3)" : "rgba(139,92,246,0.3)") : "none",
+      transition: "all 0.3s"
+    }
+  }, flipping ? "❓" : coinFace === "heads" ? "🪙" : coinFace === "tails" ? "⭐" : "🪙")), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    win: result.type === "win",
+    text: result.text
+  }), history.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 3,
+      justifyContent: "center",
+      marginBottom: 10,
+      flexWrap: "wrap"
+    }
+  }, history.map(function (h, i) {
+    return /*#__PURE__*/React.createElement("span", {
+      key: i,
+      style: {
+        fontSize: 14,
+        opacity: 1 - i * 0.04
+      }
+    }, h === "heads" ? "🪙" : "⭐");
+  })), /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center",
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#fbbf24",
+    text: "\uD83E\uDE99 Heads",
+    onClick: function () {
+      flip("heads");
+    },
+    disabled: flipping
+  }), /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#8b5cf6",
+    text: "\u2B50 Tails",
+    onClick: function () {
+      flip("tails");
+    },
+    disabled: flipping
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      fontSize: 11,
+      color: "var(--dim)"
+    }
+  }, "Pays 1.9x on correct guess")), /*#__PURE__*/React.createElement(GameGuide, {
+    items: CF_G,
+    title: "Coin Flip Guide"
+  }));
+}
+
+/* ═══ GAME: VIDEO POKER ══════════════════════════════════════════ */
+var VP_HANDS = ["Jacks or Better", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House", "Four of a Kind", "Straight Flush", "Royal Flush"];
+var VP_PAY = [1, 2, 3, 4, 6, 9, 25, 50, 250];
+var VP_G = [{
+  t: "Deal",
+  d: "You're dealt 5 cards. Choose which to hold, then draw replacements for the rest."
+}, {
+  t: "Hand Rankings",
+  d: "Jacks+ pair (1x), Two Pair (2x), Three Kind (3x), Straight (4x), Flush (6x), Full House (9x), Four Kind (25x), Straight Flush (50x), Royal Flush (250x)."
+}, {
+  t: "Strategy",
+  d: "Always hold pairs of Jacks or better. Keep any 3-to-a-flush or 3-to-a-straight."
+}];
+function vpEval(cards) {
+  var vals = cards.map(function (c) {
+    return c.v;
+  }).sort(function (a, b) {
+    return a - b;
+  });
+  var suits = cards.map(function (c) {
+    return c.s;
+  });
+  var counts = {};
+  vals.forEach(function (v) {
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  var groups = Object.values(counts).sort(function (a, b) {
+    return b - a;
+  });
+  var isFlush = suits.every(function (s) {
+    return s === suits[0];
+  });
+  var isStr = vals[4] - vals[0] === 4 && new Set(vals).size === 5 || vals[0] === 1 && vals[1] === 10 && vals[2] === 11 && vals[3] === 12 && vals[4] === 13;
+  var isRoyal = isStr && isFlush && vals[0] === 1 && vals[1] === 10;
+  if (isRoyal) return 8;
+  if (isStr && isFlush) return 7;
+  if (groups[0] === 4) return 6;
+  if (groups[0] === 3 && groups[1] === 2) return 5;
+  if (isFlush) return 4;
+  if (isStr) return 3;
+  if (groups[0] === 3) return 2;
+  if (groups[0] === 2 && groups[1] === 2) return 1;
+  if (groups[0] === 2) {
+    var pairVal = parseInt(Object.keys(counts).find(function (k) {
+      return counts[k] === 2;
+    }));
+    if (pairVal >= 11 || pairVal === 1) return 0;
+  }
+  return -1;
+}
+function VideoPoker({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [phase, setPhase] = useState("idle");
+  var [hand, setHand] = useState([]);
+  var [held, setHeld] = useState([false, false, false, false, false]);
+  var [result, setResult] = useState(null);
+  var [deck, setDeck] = useState([]);
+  var suitNames = ["♠", "♥", "♦", "♣"];
+  var valNames = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+  function mkVPDeck() {
+    var d = [];
+    for (var s = 0; s < 4; s++) for (var v = 1; v <= 13; v++) d.push({
+      v: v,
+      s: s
+    });
+    for (var i = d.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = d[i];
+      d[i] = d[j];
+      d[j] = t;
+    }
+    return d;
+  }
+  function deal() {
+    if (phase === "dealt") {
+      draw();
+      return;
+    }
+    function doIt() {
+      doDeal();
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doDeal();
+  }
+  function doDeal() {
+    var d = mkVPDeck();
+    setDeck(d);
+    setHand(d.slice(0, 5));
+    setHeld([false, false, false, false, false]);
+    setResult(null);
+    setPhase("dealt");
+  }
+  function draw() {
+    var newHand = hand.slice();
+    var di = 5;
+    for (var i = 0; i < 5; i++) {
+      if (!held[i] && di < deck.length) {
+        newHand[i] = deck[di];
+        di++;
+      }
+    }
+    setHand(newHand);
+    var rank = vpEval(newHand);
+    if (rank >= 0) {
+      var mult = VP_PAY[rank];
+      var profit = Math.floor(bet * mult);
+      setChips(function (c) {
+        return c + profit;
+      });
+      setResult({
+        type: "win",
+        text: VP_HANDS[rank] + "! +" + profit + " (" + mult + "x)"
+      });
+      if (trackResult) trackResult({
+        type: "win",
+        game: "videopoker",
+        bet: bet,
+        profit: profit,
+        mult: mult
+      });
+    } else {
+      setChips(function (c) {
+        return c - bet;
+      });
+      setResult({
+        type: "lose",
+        text: "No hand. -" + bet
+      });
+      if (trackResult) trackResult({
+        type: "lose",
+        game: "videopoker",
+        bet: bet,
+        profit: -bet
+      });
+    }
+    setPhase("result");
+  }
+  function toggleHold(i) {
+    if (phase !== "dealt") return;
+    setHeld(function (h) {
+      var n = h.slice();
+      n[i] = !n[i];
+      return n;
+    });
+  }
+  function cardDisplay(c) {
+    var isRed = c.s === 1 || c.s === 2;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 52,
+        height: 72,
+        background: "var(--surface)",
+        border: "2px solid var(--border)",
+        borderRadius: 8,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 13,
+        fontWeight: 700,
+        color: isRed ? "#e74c3c" : "var(--text)",
+        fontFamily: "'JetBrains Mono',monospace"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 16
+      }
+    }, suitNames[c.s]), /*#__PURE__*/React.createElement("div", null, valNames[c.v]));
+  }
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "🃏 Video Poker",
+    titleColor: "#c084fc",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, hand.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      justifyContent: "center",
+      marginBottom: 8
+    }
+  }, hand.map(function (c, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      onClick: function () {
+        toggleHold(i);
+      },
+      style: {
+        cursor: phase === "dealt" ? "pointer" : "default",
+        position: "relative"
+      }
+    }, cardDisplay(c), held[i] && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: -8,
+        left: "50%",
+        transform: "translateX(-50%)",
+        fontSize: 9,
+        fontWeight: 800,
+        color: "#4ade80",
+        background: "rgba(0,0,0,0.8)",
+        padding: "1px 6px",
+        borderRadius: 4
+      }
+    }, "HOLD"));
+  })), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    text: result.text,
+    type: result.type
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--dim)",
+      marginBottom: 6,
+      display: "flex",
+      gap: 8,
+      justifyContent: "center",
+      flexWrap: "wrap"
+    }
+  }, VP_HANDS.map(function (h, i) {
+    return /*#__PURE__*/React.createElement("span", {
+      key: i
+    }, h, ": ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--neon2)",
+        fontWeight: 700
+      }
+    }, VP_PAY[i], "x"));
+  })), (phase === "idle" || phase === "result") && /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#c084fc",
+    text: phase === "dealt" ? "🔄 Draw" : "🃏 Deal",
+    onClick: deal
+  })), phase === "dealt" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      fontSize: 11,
+      color: "var(--dim)"
+    }
+  }, "Tap cards to hold, then Draw")), /*#__PURE__*/React.createElement(GameGuide, {
+    items: VP_G,
+    title: "Video Poker Guide"
+  }));
+}
+
+/* ═══ GAME: BACCARAT ═════════════════════════════════════════════ */
+var BAC_G = [{
+  t: "Bet",
+  d: "Bet on Player, Banker, or Tie before cards are dealt. Banker has a slight edge but pays 0.95x due to commission."
+}, {
+  t: "Card Values",
+  d: "Aces = 1, Face cards & 10s = 0, other cards = face value. Only the last digit of the total counts (e.g. 15 = 5)."
+}, {
+  t: "Drawing Rules",
+  d: "Player draws on 0-5, stands on 6-7. Banker draws based on their total and the player's third card."
+}, {
+  t: "Payouts",
+  d: "Player wins: 2x. Banker wins: 1.95x (5% commission). Tie: 8x."
+}];
+function bacVal(cards) {
+  var t = 0;
+  cards.forEach(function (c) {
+    var v = c.v > 9 ? 0 : c.v === 1 ? 1 : c.v;
+    t += v;
+  });
+  return t % 10;
+}
+function Baccarat({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [betSide, setBetSide] = useState("player");
+  var [phase, setPhase] = useState("idle");
+  var [pCards, setPCards] = useState([]);
+  var [bCards, setBCards] = useState([]);
+  var [result, setResult] = useState(null);
+  var suitNames = ["♠", "♥", "♦", "♣"];
+  var valNames = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+  function deal() {
+    if (phase === "playing") return;
+    function doIt() {
+      doDeal();
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doDeal();
+  }
+  function doDeal() {
+    setPhase("playing");
+    setResult(null);
+    var d = [];
+    for (var s = 0; s < 4; s++) for (var v = 1; v <= 13; v++) d.push({
+      v: v,
+      s: s
+    });
+    for (var i = d.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = d[i];
+      d[i] = d[j];
+      d[j] = t;
+    }
+    var di = 0;
+    var pc = [d[di++], d[di++]];
+    var bc = [d[di++], d[di++]];
+    var pVal = bacVal(pc);
+    var bVal = bacVal(bc);
+
+    // Natural check
+    if (pVal < 8 && bVal < 8) {
+      // Player drawing rule
+      var pThird = null;
+      if (pVal <= 5) {
+        pThird = d[di++];
+        pc.push(pThird);
+        pVal = bacVal(pc);
+      }
+      // Banker drawing rule
+      if (pThird === null) {
+        if (bVal <= 5) {
+          bc.push(d[di++]);
+          bVal = bacVal(bc);
+        }
+      } else {
+        var pt = pThird.v > 9 ? 0 : pThird.v === 1 ? 1 : pThird.v;
+        if (bVal <= 2) {
+          bc.push(d[di++]);
+        } else if (bVal === 3 && pt !== 8) {
+          bc.push(d[di++]);
+        } else if (bVal === 4 && pt >= 2 && pt <= 7) {
+          bc.push(d[di++]);
+        } else if (bVal === 5 && pt >= 4 && pt <= 7) {
+          bc.push(d[di++]);
+        } else if (bVal === 6 && pt >= 6 && pt <= 7) {
+          bc.push(d[di++]);
+        }
+        bVal = bacVal(bc);
+      }
+    }
+    if (window.__fluxForceWin) {
+      if (betSide === "player") pVal = 9;else if (betSide === "banker") bVal = 9;else {
+        pVal = 5;
+        bVal = 5;
+      }
+    }
+    setPCards(pc);
+    setBCards(bc);
+    setTimeout(function () {
+      var winner = pVal > bVal ? "player" : bVal > pVal ? "banker" : "tie";
+      var won = betSide === winner;
+      var isTie = winner === "tie";
+      if (won) {
+        var mult = betSide === "tie" ? 8 : betSide === "banker" ? 1.95 : 2;
+        var profit = Math.floor(bet * (mult - 1));
+        setChips(function (c) {
+          return c + profit;
+        });
+        setResult({
+          type: "win",
+          text: (isTie ? "Tie" : winner.charAt(0).toUpperCase() + winner.slice(1)) + " wins! +" + profit
+        });
+        if (trackResult) trackResult({
+          type: "win",
+          game: "baccarat",
+          bet: bet,
+          profit: profit,
+          betSide: betSide
+        });
+      } else if (isTie && betSide !== "tie") {
+        setResult({
+          type: "lose",
+          text: "Tie — push (bet returned)"
+        });
+      } else {
+        setChips(function (c) {
+          return c - bet;
+        });
+        setResult({
+          type: "lose",
+          text: (winner === "tie" ? "Tie" : winner.charAt(0).toUpperCase() + winner.slice(1)) + " wins. -" + bet
+        });
+        if (trackResult) trackResult({
+          type: "lose",
+          game: "baccarat",
+          bet: bet,
+          profit: -bet
+        });
+      }
+      setPhase("result");
+    }, 1000);
+  }
+  function cardEl(c) {
+    var isRed = c.s === 1 || c.s === 2;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 44,
+        height: 62,
+        background: "var(--surface)",
+        border: "2px solid var(--border)",
+        borderRadius: 6,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 12,
+        fontWeight: 700,
+        color: isRed ? "#e74c3c" : "var(--text)",
+        fontFamily: "'JetBrains Mono',monospace"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14
+      }
+    }, suitNames[c.s]), /*#__PURE__*/React.createElement("div", null, valNames[c.v]));
+  }
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "🎴 Baccarat",
+    titleColor: "#f39c12",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, pCards.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      gap: 30,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: "#3498db",
+      marginBottom: 4,
+      letterSpacing: 1
+    }
+  }, "PLAYER (", bacVal(pCards), ")"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4,
+      justifyContent: "center"
+    }
+  }, pCards.map(function (c, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: i
+    }, cardEl(c));
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: "#e74c3c",
+      marginBottom: 4,
+      letterSpacing: 1
+    }
+  }, "BANKER (", bacVal(bCards), ")"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4,
+      justifyContent: "center"
+    }
+  }, bCards.map(function (c, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: i
+    }, cardEl(c));
+  })))), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    text: result.text,
+    type: result.type
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      justifyContent: "center",
+      marginBottom: 8
+    }
+  }, ["player", "banker", "tie"].map(function (s) {
+    var labels = {
+      player: "👤 Player 2x",
+      banker: "🏦 Banker 1.95x",
+      tie: "🤝 Tie 8x"
+    };
+    return /*#__PURE__*/React.createElement("button", {
+      key: s,
+      onClick: function () {
+        setBetSide(s);
+      },
+      style: {
+        padding: "8px 14px",
+        borderRadius: 8,
+        fontSize: 12,
+        fontWeight: 700,
+        background: betSide === s ? "#8b5cf620" : "var(--surface2)",
+        color: betSide === s ? "#c084fc" : "var(--dim)",
+        border: betSide === s ? "2px solid #8b5cf6" : "1px solid var(--border)"
+      }
+    }, labels[s]);
+  })), (phase === "idle" || phase === "result") && /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#f39c12",
+    text: "\uD83C\uDFB4 Deal",
+    onClick: deal,
+    disabled: phase === "playing"
+  }))), /*#__PURE__*/React.createElement(GameGuide, {
+    items: BAC_G,
+    title: "Baccarat Guide"
+  }));
+}
 const TAG_COLORS = {
   CARDS: "#c084fc",
   LUCK: "#ff5e78",
@@ -7112,7 +8658,9 @@ const TAG_COLORS = {
   BRAIN: "#9b59b6",
   VISUAL: "#ff8c42",
   MEMORY: "#3498db",
-  WORDS: "#56c1ff"
+  WORDS: "#56c1ff",
+  CRASH: "#fbbf24",
+  TABLE: "#f39c12"
 };
 const GAME_CREDITS = [{
   name: "Blackjack",
@@ -7277,6 +8825,57 @@ const GAME_CREDITS = [{
   }, {
     t: "Human Benchmark",
     u: "https://humanbenchmark.com/tests/aim"
+  }]
+}, {
+  name: "Crash",
+  src: "Rising multiplier game — cash out before it crashes",
+  links: [{
+    t: "Stake Crash",
+    u: "https://stake.com/casino/games/crash"
+  }, {
+    t: "Rollbit X-Crash",
+    u: "https://rollbit.com"
+  }]
+}, {
+  name: "Wheel",
+  src: "Fortune wheel with multiplier segments",
+  links: [{
+    t: "Stake Wheel",
+    u: "https://stake.com/casino/games/wheel"
+  }]
+}, {
+  name: "Tower",
+  src: "Floor-climbing risk game",
+  links: [{
+    t: "Stake Dragon Tower",
+    u: "https://stake.com/casino/games/dragon-tower"
+  }]
+}, {
+  name: "Coin Flip",
+  src: "Classic 50/50 coin toss",
+  links: [{
+    t: "Stake Flip",
+    u: "https://stake.com/casino/games/flip"
+  }, {
+    t: "Rollbit X-Flip",
+    u: "https://rollbit.com"
+  }]
+}, {
+  name: "Video Poker",
+  src: "Jacks or Better draw poker",
+  links: [{
+    t: "Stake Video Poker",
+    u: "https://stake.com/casino/games/video-poker"
+  }]
+}, {
+  name: "Baccarat",
+  src: "Classic punto banco",
+  links: [{
+    t: "Stake Baccarat",
+    u: "https://stake.com/casino/games/baccarat"
+  }, {
+    t: "Rainbet",
+    u: "https://rainbet.com"
   }]
 }];
 function DebtPopup({
@@ -7660,18 +9259,71 @@ const GAMES = [{
   tag: "LOTTERY",
   safe: false,
   safeOnly: false
+}, {
+  id: "crash",
+  name: "Crash",
+  icon: "📈",
+  desc: "Cash out before it crashes",
+  color: "#fbbf24",
+  tag: "CRASH",
+  safe: false,
+  safeOnly: false
+}, {
+  id: "wheel",
+  name: "Wheel",
+  icon: "🎡",
+  desc: "Spin for multipliers",
+  color: "#f39c12",
+  tag: "LUCK",
+  safe: false,
+  safeOnly: false
+}, {
+  id: "tower",
+  name: "Tower",
+  icon: "🗼",
+  desc: "Climb floors, dodge traps",
+  color: "#e67e22",
+  tag: "RISK",
+  safe: false,
+  safeOnly: false
+}, {
+  id: "coinflip",
+  name: "Coin Flip",
+  icon: "🪙",
+  desc: "Heads or tails, 1.9x",
+  color: "var(--neon2)",
+  tag: "INSTANT",
+  safe: false,
+  safeOnly: false
+}, {
+  id: "videopoker",
+  name: "Video Poker",
+  icon: "🃏",
+  desc: "Hold & draw for poker hands",
+  color: "#c084fc",
+  tag: "CARDS",
+  safe: false,
+  safeOnly: false
+}, {
+  id: "baccarat",
+  name: "Baccarat",
+  icon: "🎴",
+  desc: "Player vs Banker",
+  color: "#f39c12",
+  tag: "TABLE",
+  safe: false,
+  safeOnly: false
 }];
 function GameCard({
   game,
   onClick,
   animDelay,
-  reduceAnim,
   isWide
 }) {
   const [h, setH] = useState(false);
   const isLadder = game.id === "ladder";
   const hoverTransform = isLadder ? "translateY(-3px) rotate(1.5deg)" : "translateY(-4px) scale(1.02)";
-  const animStr = reduceAnim ? "fadeUp 0.2s ease-out " + animDelay + "ms both" : "staggerPop 0.7s cubic-bezier(0.34,1.56,0.64,1) " + animDelay + "ms both";
+  const animStr = "staggerPop 0.7s cubic-bezier(0.34,1.56,0.64,1) " + animDelay + "ms both";
   return /*#__PURE__*/React.createElement("div", {
     onClick: onClick,
     onMouseEnter: function () {
@@ -7909,9 +9561,6 @@ function FluxApp() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showStats, setShowStats] = useState(false);
-  const [confirmToggle, setConfirmToggle] = useState(null);
-  const [reduceAnim, setReduceAnim] = useState(save.reduceAnim || false);
-  const [animSpeed, setAnimSpeed] = useState(save.animSpeed || 1);
   const [modeKey, setModeKey] = useState(0);
   const [isWide, setIsWide] = useState(function () {
     return typeof window !== "undefined" && window.innerWidth > 900;
@@ -7920,9 +9569,15 @@ function FluxApp() {
   const [betHistory, setBetHistory] = useState(save.betHistory || []);
   const [stats, setStats] = useState(save.stats || DEFAULT_SAVE.stats);
   const [toastQueue, setToastQueue] = useState([]);
+  const [visibleToasts, setVisibleToasts] = useState([]);
+  const toastIdRef = useRef(0);
+  const toastTimerRef = useRef(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [forceWin, setForceWin] = useState(false);
+  const [toastPos, setToastPos] = useState(save.toastPos || "bottom-right");
+  const [showToastPicker, setShowToastPicker] = useState(false);
+  const [username, setUsername] = useState(save.username || "");
   const logoTapRef = useRef({
     count: 0,
     timer: null
@@ -7944,12 +9599,6 @@ function FluxApp() {
     }, 500);
   }
   useEffect(function () {
-    window.__neonReduceAnim = reduceAnim;
-  }, [reduceAnim]);
-  useEffect(function () {
-    window.__fluxAnimSpeed = animSpeed;
-  }, [animSpeed]);
-  useEffect(function () {
     window.__fluxForceWin = forceWin;
   }, [forceWin]);
   useEffect(function () {
@@ -7967,14 +9616,14 @@ function FluxApp() {
     var saveData = {
       chips: chips,
       safeMode: safeMode,
-      reduceAnim: reduceAnim,
-      animSpeed: animSpeed,
+      toastPos: toastPos,
+      username: username,
       achievements: achievements,
       betHistory: betHistory.slice(-50),
       stats: stats
     };
     writeSave(saveData);
-  }, [chips, safeMode, reduceAnim, animSpeed, achievements, betHistory, stats]);
+  }, [chips, safeMode, toastPos, username, achievements, betHistory, stats]);
 
   // Track game results for achievements/stats/history
   function trackResult(event) {
@@ -8018,22 +9667,67 @@ function FluxApp() {
       setAchievements(function (a) {
         return a.concat(newAch);
       });
-      setToastQueue(function (q) {
-        return q.concat(newAch);
-      });
+      setTimeout(function () {
+        setToastQueue(function (q) {
+          return q.concat(newAch);
+        });
+      }, 2500);
     }
   }
-  function dismissToast() {
-    setToastQueue(function (q) {
-      return q.slice(1);
+
+  // Process toast queue - reveal achievements with staggered delays
+  useEffect(function () {
+    if (toastQueue.length === 0) return;
+    if (toastTimerRef.current) return; // already processing
+    function showNext() {
+      setToastQueue(function (q) {
+        if (q.length === 0) {
+          toastTimerRef.current = null;
+          return q;
+        }
+        var achId = q[0];
+        var remaining = q.slice(1);
+        toastIdRef.current++;
+        var newToast = {
+          id: achId,
+          queueId: toastIdRef.current
+        };
+        setVisibleToasts(function (v) {
+          // Cap at 5 visible toasts max
+          var trimmed = v.length >= 5 ? v.slice(1) : v;
+          return trimmed.concat([newToast]);
+        });
+        if (remaining.length > 0) {
+          // Stagger: faster when many queued (1s for 3+, 1.5s for 2, 2s for 1)
+          var staggerDelay = remaining.length >= 3 ? 800 : remaining.length >= 2 ? 1200 : 1500;
+          toastTimerRef.current = setTimeout(showNext, staggerDelay);
+        } else {
+          toastTimerRef.current = null;
+        }
+        return remaining;
+      });
+    }
+    toastTimerRef.current = setTimeout(showNext, 100);
+    return function () {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+    };
+  }, [toastQueue.length]);
+  function dismissToast(queueId) {
+    setVisibleToasts(function (v) {
+      return v.filter(function (t) {
+        return t.queueId !== queueId;
+      });
     });
   }
   function doResetData() {
     resetSave();
     setChips(500);
     setSafeMode(false);
-    setReduceAnim(false);
-    setAnimSpeed(1);
+    setToastPos("bottom-right");
+    setUsername("");
     setAchievements([]);
     setBetHistory([]);
     setStats(DEFAULT_SAVE.stats);
@@ -8048,9 +9742,11 @@ function FluxApp() {
       setAchievements(function (a) {
         return a.concat(newAch);
       });
-      setToastQueue(function (q) {
-        return q.concat(newAch);
-      });
+      setTimeout(function () {
+        setToastQueue(function (q) {
+          return q.concat(newAch);
+        });
+      }, 1500);
     }
   }, [safeMode]);
   useEffect(function () {
@@ -8121,6 +9817,12 @@ function FluxApp() {
   if (game === "aimtrainer") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(AimTrainer, gp));
   if (game === "typingspeed") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(TypingSpeed, gp));
   if (game === "keno") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Keno, gp));
+  if (game === "crash") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Crash, gp));
+  if (game === "wheel") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Wheel, gp));
+  if (game === "tower") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Tower, gp));
+  if (game === "coinflip") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(CoinFlip, gp));
+  if (game === "videopoker") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(VideoPoker, gp));
+  if (game === "baccarat") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Baccarat, gp));
   return /*#__PURE__*/React.createElement(Wrap, null, splash !== "done" && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -8223,7 +9925,15 @@ function FluxApp() {
       letterSpacing: 0.4,
       fontWeight: 500
     }
-  }, safeMode ? "10 Games · Pure Skill" : "10 Games · Always Shifting"), !safeMode && /*#__PURE__*/React.createElement("div", {
+  }, safeMode ? "22 Games · Pure Skill" : "22 Games · Always Shifting"), username && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--neon)",
+      fontFamily: "'JetBrains Mono',monospace",
+      marginBottom: 8,
+      opacity: 0.7
+    }
+  }, "👤 " + username), !safeMode && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -8261,8 +9971,7 @@ function FluxApp() {
       onClick: function () {
         setGame(g.id);
       },
-      animDelay: reduceAnim ? 50 : i * 100,
-      reduceAnim: reduceAnim,
+      animDelay: i * 100,
       isWide: isWide
     });
   })), /*#__PURE__*/React.createElement("div", {
@@ -8312,7 +10021,7 @@ function FluxApp() {
     onClick: function (e) {
       if (e.target === e.currentTarget) {
         setShowSettings(false);
-        setConfirmToggle(null);
+        setShowToastPicker(false);
         setShowResetConfirm(false);
       }
     }
@@ -8329,7 +10038,7 @@ function FluxApp() {
       animation: "fadeUp 0.25s",
       backdropFilter: "blur(16px)"
     }
-  }, !showResetConfirm && confirmToggle === null && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, !showResetConfirm && !showToastPicker && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -8344,7 +10053,7 @@ function FluxApp() {
       fontStyle: "italic",
       color: "var(--text)"
     }
-  }, "\u2699\uFE0F Settings"), /*#__PURE__*/React.createElement("button", {
+  }, "⚙️ Settings"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowSettings(false);
     },
@@ -8360,7 +10069,7 @@ function FluxApp() {
       alignItems: "center",
       justifyContent: "center"
     }
-  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -8382,7 +10091,7 @@ function FluxApp() {
     style: {
       fontSize: 18
     }
-  }, "\uD83D\uDEE1\uFE0F"), /*#__PURE__*/React.createElement("span", {
+  }, "🛡️"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700,
       fontSize: 14,
@@ -8428,67 +10137,6 @@ function FluxApp() {
     }
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "14px 16px",
-      background: "var(--surface2)",
-      borderRadius: 12,
-      border: "1px solid var(--border)",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "\uD83D\uDD0B"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "var(--text)"
-    }
-  }, "Reduce Animations")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--dim)",
-      lineHeight: 1.4,
-      maxWidth: 200
-    }
-  }, "Less effects for older devices.")), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setConfirmToggle(reduceAnim ? "reduceOff" : "reduceOn");
-    },
-    style: {
-      width: 48,
-      height: 28,
-      borderRadius: 14,
-      background: reduceAnim ? "var(--neon2)" : "var(--surface)",
-      border: reduceAnim ? "2px solid var(--neon2)" : "2px solid var(--border)",
-      position: "relative",
-      transition: "all 0.3s",
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 20,
-      height: 20,
-      borderRadius: "50%",
-      background: "#fff",
-      position: "absolute",
-      top: 2,
-      left: reduceAnim ? 24 : 2,
-      transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
-    }
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
       padding: "14px 16px",
       background: "var(--surface2)",
       borderRadius: 12,
@@ -8506,42 +10154,86 @@ function FluxApp() {
     style: {
       fontSize: 18
     }
-  }, "\u26A1"), /*#__PURE__*/React.createElement("span", {
+  }, "👤"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700,
       fontSize: 14,
       color: "var(--text)"
     }
-  }, "Animation Speed"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: "'JetBrains Mono',monospace",
-      fontSize: 13,
-      color: "var(--neon2)",
-      fontWeight: 700,
-      marginLeft: "auto"
-    }
-  }, animSpeed.toFixed(1), "x")), /*#__PURE__*/React.createElement("input", {
-    type: "range",
-    min: "10",
-    max: "40",
-    step: "1",
-    value: animSpeed * 10,
+  }, "Username")), /*#__PURE__*/React.createElement("input", {
+    value: username,
     onChange: function (e) {
-      setAnimSpeed(parseInt(e.target.value) / 10);
+      setUsername(e.target.value.slice(0, 20));
     },
+    placeholder: "Enter a name...",
     style: {
       width: "100%",
-      accentColor: "var(--neon2)"
+      padding: "8px 12px",
+      borderRadius: 8,
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      color: "var(--text)",
+      fontSize: 14,
+      fontFamily: "'JetBrains Mono',monospace"
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      justifyContent: "space-between",
       fontSize: 10,
       color: "var(--dim)",
       marginTop: 4
     }
-  }, /*#__PURE__*/React.createElement("span", null, "1x"), /*#__PURE__*/React.createElement("span", null, "2x"), /*#__PURE__*/React.createElement("span", null, "3x"), /*#__PURE__*/React.createElement("span", null, "4x"))), /*#__PURE__*/React.createElement("div", {
+  }, username.length + "/20 · Shows on stats & share cards")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px 16px",
+      background: "var(--surface2)",
+      borderRadius: 12,
+      border: "1px solid var(--border)",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "🔔"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: "var(--text)"
+    }
+  }, "Popup Position")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      lineHeight: 1.4
+    }
+  }, "Where achievements appear.")), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowToastPicker(true);
+    },
+    style: {
+      padding: "6px 14px",
+      borderRadius: 8,
+      fontSize: 11,
+      fontWeight: 700,
+      background: "var(--surface)",
+      color: "var(--cool)",
+      border: "1px solid rgba(86,193,255,0.3)",
+      whiteSpace: "nowrap"
+    }
+  }, toastPos === "bottom-right" ? "↘ Bottom Right" : toastPos === "bottom-left" ? "↙ Bottom Left" : toastPos === "top-right" ? "↗ Top Right" : "↖ Top Left"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
@@ -8703,7 +10395,7 @@ function FluxApp() {
       color: "#fff",
       border: "2px solid var(--accent)"
     }
-  }, "Yes, Reset"))), confirmToggle !== null && /*#__PURE__*/React.createElement("div", {
+  }, "Yes, Reset"))), showToastPicker && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center"
     }
@@ -8712,7 +10404,7 @@ function FluxApp() {
       fontSize: 36,
       marginBottom: 12
     }
-  }, confirmToggle === "reduceOn" ? "🔋" : "✨"), /*#__PURE__*/React.createElement("div", {
+  }, "🔔"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: "'Playfair Display',serif",
       fontSize: 18,
@@ -8721,47 +10413,53 @@ function FluxApp() {
       color: "var(--text)",
       marginBottom: 8
     }
-  }, confirmToggle === "reduceOn" ? "Reduce Animations?" : "Restore Animations?"), /*#__PURE__*/React.createElement("p", {
+  }, "Popup Position"), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 13,
       color: "var(--dim)",
       lineHeight: 1.5,
-      marginBottom: 20
+      marginBottom: 16
     }
-  }, confirmToggle === "reduceOn" ? "Reduces background effects and visual flair. Recommended for older devices." : "Restores all animations and visual transitions."), /*#__PURE__*/React.createElement("div", {
+  }, "Choose where achievement popups appear."), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      gap: 10,
-      justifyContent: "center"
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8,
+      maxWidth: 260,
+      margin: "0 auto 16px"
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, [["top-left", "↖ Top Left"], ["top-right", "↗ Top Right"], ["bottom-left", "↙ Bottom Left"], ["bottom-right", "↘ Bottom Right"]].map(function (opt) {
+    var selected = toastPos === opt[0];
+    return /*#__PURE__*/React.createElement("button", {
+      key: opt[0],
+      onClick: function () {
+        setToastPos(opt[0]);
+      },
+      style: {
+        padding: "12px 8px",
+        borderRadius: 10,
+        fontSize: 13,
+        fontWeight: 700,
+        background: selected ? "rgba(86,193,255,0.15)" : "var(--surface2)",
+        color: selected ? "var(--cool)" : "var(--dim)",
+        border: selected ? "2px solid var(--cool)" : "1px solid var(--border)",
+        transition: "all 0.2s"
+      }
+    }, opt[1]);
+  })), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
-      setConfirmToggle(null);
+      setShowToastPicker(false);
     },
     style: {
-      padding: "10px 24px",
+      padding: "10px 32px",
       borderRadius: 10,
       fontSize: 14,
       fontWeight: 700,
-      background: "var(--surface2)",
-      color: "var(--dim)",
-      border: "2px solid var(--border)"
-    }
-  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setReduceAnim(confirmToggle === "reduceOn");
-      setConfirmToggle(null);
-    },
-    style: {
-      padding: "10px 24px",
-      borderRadius: 10,
-      fontSize: 14,
-      fontWeight: 700,
-      background: confirmToggle === "reduceOn" ? "var(--neon2)" : "var(--green)",
+      background: "linear-gradient(135deg,#c084fc,#818cf8)",
       color: "#fff",
-      border: "2px solid " + (confirmToggle === "reduceOn" ? "var(--neon2)" : "var(--green)")
+      border: "2px solid #8b5cf6"
     }
-  }, "Yes, ", confirmToggle === "reduceOn" ? "Reduce" : "Restore"))))), showInfo && /*#__PURE__*/React.createElement(InfoPanel, {
+  }, "Done")))), showInfo && /*#__PURE__*/React.createElement(InfoPanel, {
     onClose: function () {
       setShowInfo(false);
     }
@@ -8775,6 +10473,7 @@ function FluxApp() {
     betHistory: betHistory,
     achievements: achievements,
     chips: chips,
+    username: username,
     onClose: function () {
       setShowStats(false);
     }
@@ -8798,9 +10497,10 @@ function FluxApp() {
     onCancel: function () {
       setDebtPopup(null);
     }
-  }), toastQueue.length > 0 && /*#__PURE__*/React.createElement(AchievementToast, {
-    achievement: toastQueue[0],
-    onDone: dismissToast
+  }), visibleToasts.length > 0 && /*#__PURE__*/React.createElement(AchievementToastStack, {
+    toasts: visibleToasts,
+    onDismiss: dismissToast,
+    pos: toastPos
   }));
 }
 function Wrap({
@@ -8837,7 +10537,14 @@ function Wrap({
 }
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(React.createElement(FluxApp));
+}
 </script>
-<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){});}</script>
+<script>
+if('serviceWorker' in navigator){
+  setTimeout(function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }, 3000);
+}
+</script>
 </body>
 </html>
