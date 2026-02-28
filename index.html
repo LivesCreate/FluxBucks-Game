@@ -181,6 +181,7 @@ var DEFAULT_SAVE = {
   safeMode: false,
   toastPos: "bottom-right",
   username: "",
+  quickPlay: false,
   achievements: [],
   betHistory: [],
   stats: {
@@ -446,13 +447,6 @@ var ACHIEVEMENTS = [{
   hint: "Reach the top of the tower",
   tier: "gold"
 }, {
-  id: "wheel_10x",
-  name: "Jackpot Spin",
-  desc: "Hit 10x on the Wheel",
-  icon: "🎡",
-  hint: "Land on the 10x segment",
-  tier: "gold"
-}, {
   id: "flip_streak_5",
   name: "Lucky Coin",
   desc: "Win 5 coin flips in a row",
@@ -567,7 +561,6 @@ function checkAchievements(save, event) {
   if (event.game === "crash" && event.mult >= 10) add("crash_10x");
   if (event.game === "crash" && event.mult >= 50) add("crash_50x");
   if (event.game === "tower" && event.mult >= 30) add("tower_clear");
-  if (event.game === "wheel" && event.mult >= 10) add("wheel_10x");
   if (event.game === "coinflip" && s.currentWinStreak >= 5) add("flip_streak_5");
   if (event.safeMode) add("safe_mode");
   if (s.totalWagered >= 1000) add("wagered_1k");
@@ -1210,8 +1203,8 @@ function Starfield() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     const dpr = window.devicePixelRatio || 1;
-    let W = window.innerWidth;
-    let H = window.innerHeight;
+    let W = window.innerWidth + 100;
+    let H = window.innerHeight + 100;
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     canvas.style.width = W + "px";
@@ -1697,8 +1690,8 @@ function Starfield() {
     }
     draw();
     const handleResize = () => {
-      W = window.innerWidth;
-      H = window.innerHeight;
+      W = window.innerWidth + 100;
+      H = window.innerHeight + 100;
       const dpr2 = window.devicePixelRatio || 1;
       canvas.width = W * dpr2;
       canvas.height = H * dpr2;
@@ -1727,15 +1720,13 @@ function Starfield() {
   return /*#__PURE__*/React.createElement("canvas", {
     ref: canvasRef,
     style: {
-      position: "fixed",
+      position: "absolute",
       top: 0,
       left: 0,
-      width: "100vw",
-      height: "100vh",
-      height: "100dvh",
+      width: "100%",
+      height: "100%",
       zIndex: 0,
-      pointerEvents: "none",
-      objectFit: "cover"
+      pointerEvents: "none"
     }
   });
 }
@@ -7281,7 +7272,7 @@ function Crash({
     return Math.max(1.01, 1 / (1 - r) * 0.97);
   }
   function startRound() {
-    if (phase !== "idle") return;
+    if (phase === "rising") return;
     function doIt() {
       doStart();
     }
@@ -7428,284 +7419,6 @@ function Crash({
 }
 
 /* ═══ GAME: WHEEL ════════════════════════════════════════════════ */
-var WH_SEGS = [{
-  label: "0x",
-  mult: 0,
-  color: "#e74c3c",
-  weight: 3
-}, {
-  label: "1.2x",
-  mult: 1.2,
-  color: "#3498db",
-  weight: 5
-}, {
-  label: "1.5x",
-  mult: 1.5,
-  color: "#2ecc71",
-  weight: 4
-}, {
-  label: "2x",
-  mult: 2,
-  color: "#9b59b6",
-  weight: 3
-}, {
-  label: "0x",
-  mult: 0,
-  color: "#e74c3c",
-  weight: 3
-}, {
-  label: "1.5x",
-  mult: 1.5,
-  color: "#2ecc71",
-  weight: 4
-}, {
-  label: "3x",
-  mult: 3,
-  color: "#f39c12",
-  weight: 2
-}, {
-  label: "1.2x",
-  mult: 1.2,
-  color: "#3498db",
-  weight: 5
-}, {
-  label: "5x",
-  mult: 5,
-  color: "#e67e22",
-  weight: 1
-}, {
-  label: "0x",
-  mult: 0,
-  color: "#e74c3c",
-  weight: 3
-}, {
-  label: "2x",
-  mult: 2,
-  color: "#9b59b6",
-  weight: 3
-}, {
-  label: "10x",
-  mult: 10,
-  color: "#fbbf24",
-  weight: 0.5
-}, {
-  label: "1.5x",
-  mult: 1.5,
-  color: "#2ecc71",
-  weight: 4
-}, {
-  label: "1.2x",
-  mult: 1.2,
-  color: "#3498db",
-  weight: 5
-}, {
-  label: "3x",
-  mult: 3,
-  color: "#f39c12",
-  weight: 2
-}, {
-  label: "0x",
-  mult: 0,
-  color: "#e74c3c",
-  weight: 3
-}];
-var WH_G = [{
-  t: "Spin the Wheel",
-  d: "Place your bet and spin. The wheel lands on a random segment with a multiplier."
-}, {
-  t: "Multipliers",
-  d: "Segments include 0x (lose), 1.2x, 1.5x, 2x, 3x, 5x, and a rare 10x jackpot segment."
-}, {
-  t: "Odds",
-  d: "More common multipliers appear on larger segments. Higher payouts are rarer."
-}];
-function Wheel({
-  chips,
-  setChips,
-  onBack,
-  safeMode,
-  setDebtPopup,
-  trackResult
-}) {
-  var [bet, setBet] = useState(10);
-  var [spinning, setSpinning] = useState(false);
-  var [rotation, setRotation] = useState(0);
-  var [result, setResult] = useState(null);
-  var [landed, setLanded] = useState(null);
-  function weightedPick() {
-    if (window.__fluxForceWin) {
-      var winners = WH_SEGS.map(function (s, i) {
-        return {
-          s: s,
-          i: i
-        };
-      }).filter(function (x) {
-        return x.s.mult >= 2;
-      });
-      var w = winners[Math.floor(Math.random() * winners.length)];
-      return w.i;
-    }
-    var totalW = 0;
-    for (var i = 0; i < WH_SEGS.length; i++) totalW += WH_SEGS[i].weight;
-    var r = Math.random() * totalW;
-    var acc = 0;
-    for (var j = 0; j < WH_SEGS.length; j++) {
-      acc += WH_SEGS[j].weight;
-      if (r <= acc) return j;
-    }
-    return 0;
-  }
-  function spin() {
-    if (spinning) return;
-    function doIt() {
-      doSpin();
-    }
-    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
-    doSpin();
-  }
-  function doSpin() {
-    setSpinning(true);
-    setResult(null);
-    setLanded(null);
-    var idx = weightedPick();
-    var seg = WH_SEGS[idx];
-    var segAngle = 360 / WH_SEGS.length;
-    var targetAngle = 360 - (idx * segAngle + segAngle / 2);
-    var fullSpins = 1800 + Math.random() * 720;
-    var finalRot = fullSpins + targetAngle;
-    setRotation(function (prev) {
-      return prev + finalRot;
-    });
-    setTimeout(function () {
-      setLanded(seg);
-      setSpinning(false);
-      if (seg.mult === 0) {
-        setChips(function (c) {
-          return c - bet;
-        });
-        setResult({
-          type: "lose",
-          text: "0x — Lost " + bet
-        });
-        if (trackResult) trackResult({
-          type: "lose",
-          game: "wheel",
-          bet: bet,
-          profit: -bet
-        });
-      } else {
-        var profit = Math.floor(bet * seg.mult) - bet;
-        setChips(function (c) {
-          return c + profit;
-        });
-        if (profit > 0) {
-          setResult({
-            type: "win",
-            text: seg.label + " — Won " + profit + "!"
-          });
-          if (trackResult) trackResult({
-            type: "win",
-            game: "wheel",
-            bet: bet,
-            profit: profit,
-            mult: seg.mult
-          });
-        } else {
-          setResult({
-            type: "win",
-            text: seg.label + " — Break even!"
-          });
-        }
-      }
-    }, 4200);
-  }
-  var segAngle = 360 / WH_SEGS.length;
-  return /*#__PURE__*/React.createElement(GameWrap, {
-    title: "🎡 Wheel",
-    titleColor: "#f39c12",
-    chips: chips,
-    setChips: setChips,
-    onBack: onBack,
-    safeMode: safeMode
-  }, /*#__PURE__*/React.createElement(Panel, {
-    style: {
-      textAlign: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "relative",
-      width: 220,
-      height: 220,
-      margin: "0 auto 16px"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "absolute",
-      top: -14,
-      left: "50%",
-      transform: "translateX(-50%)",
-      fontSize: 22,
-      zIndex: 2,
-      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))"
-    }
-  }, "▼"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 220,
-      height: 220,
-      borderRadius: "50%",
-      border: "4px solid var(--border)",
-      overflow: "hidden",
-      transform: "rotate(" + rotation + "deg)",
-      transition: spinning ? "transform 4s cubic-bezier(0.2,0.8,0.3,1)" : "none",
-      position: "relative"
-    }
-  }, WH_SEGS.map(function (seg, i) {
-    var startAngle = i * segAngle;
-    var midAngle = startAngle + segAngle / 2;
-    var rad = midAngle * Math.PI / 180;
-    var tx = 50 + Math.sin(rad) * 36;
-    var ty = 50 - Math.cos(rad) * 36;
-    return /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        position: "absolute",
-        width: "100%",
-        height: "100%",
-        background: "conic-gradient(from " + startAngle + "deg, " + seg.color + " 0deg, " + seg.color + " " + segAngle + "deg, transparent " + segAngle + "deg)",
-        opacity: 0.85
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        position: "absolute",
-        left: tx + "%",
-        top: ty + "%",
-        transform: "translate(-50%,-50%) rotate(" + -rotation + "deg)",
-        fontSize: 9,
-        fontWeight: 700,
-        color: "#fff",
-        textShadow: "0 1px 3px rgba(0,0,0,0.7)",
-        pointerEvents: "none",
-        transition: spinning ? "transform 4s cubic-bezier(0.2,0.8,0.3,1)" : "none"
-      }
-    }, seg.label));
-  }))), result && /*#__PURE__*/React.createElement(ResultBanner, {
-    win: result.type === "win",
-    text: result.text
-  }), /*#__PURE__*/React.createElement(BetSelector, {
-    bet: bet,
-    setBet: setBet,
-    chips: chips
-  }), /*#__PURE__*/React.createElement(GameBtn, {
-    color: "#f39c12",
-    text: spinning ? "Spinning..." : "Spin!",
-    onClick: spin,
-    disabled: spinning
-  })), /*#__PURE__*/React.createElement(GameGuide, {
-    items: WH_G,
-    title: "Wheel Guide"
-  }));
-}
-
 /* ═══ GAME: TOWER ════════════════════════════════════════════════ */
 var TW_G = [{
   t: "Climb the Tower",
@@ -7738,7 +7451,7 @@ function Tower({
   var COLS = 3;
   var MULTS = [1, 1.4, 2, 3, 4.5, 7, 11, 17, 30];
   function startGame() {
-    if (phase !== "idle") return;
+    if (phase === "playing") return;
     function doIt() {
       doStart();
     }
@@ -8837,13 +8550,6 @@ const GAME_CREDITS = [{
     u: "https://rollbit.com"
   }]
 }, {
-  name: "Wheel",
-  src: "Fortune wheel with multiplier segments",
-  links: [{
-    t: "Stake Wheel",
-    u: "https://stake.com/casino/games/wheel"
-  }]
-}, {
   name: "Tower",
   src: "Floor-climbing risk game",
   links: [{
@@ -9269,15 +8975,6 @@ const GAMES = [{
   safe: false,
   safeOnly: false
 }, {
-  id: "wheel",
-  name: "Wheel",
-  icon: "🎡",
-  desc: "Spin for multipliers",
-  color: "#f39c12",
-  tag: "LUCK",
-  safe: false,
-  safeOnly: false
-}, {
   id: "tower",
   name: "Tower",
   icon: "🗼",
@@ -9318,12 +9015,13 @@ function GameCard({
   game,
   onClick,
   animDelay,
-  isWide
+  isWide,
+  quickPlay
 }) {
   const [h, setH] = useState(false);
   const isLadder = game.id === "ladder";
   const hoverTransform = isLadder ? "translateY(-3px) rotate(1.5deg)" : "translateY(-4px) scale(1.02)";
-  const animStr = "staggerPop 0.7s cubic-bezier(0.34,1.56,0.64,1) " + animDelay + "ms both";
+  const animStr = quickPlay ? "none" : "staggerPop 0.7s cubic-bezier(0.34,1.56,0.64,1) " + animDelay + "ms both";
   return /*#__PURE__*/React.createElement("div", {
     onClick: onClick,
     onMouseEnter: function () {
@@ -9559,6 +9257,7 @@ function FluxApp() {
   const [debtPopup, setDebtPopup] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [modeKey, setModeKey] = useState(0);
@@ -9578,6 +9277,8 @@ function FluxApp() {
   const [toastPos, setToastPos] = useState(save.toastPos || "bottom-right");
   const [showToastPicker, setShowToastPicker] = useState(false);
   const [username, setUsername] = useState(save.username || "");
+  const [editUsername, setEditUsername] = useState(save.username || "");
+  const [quickPlay, setQuickPlay] = useState(save.quickPlay || false);
   const logoTapRef = useRef({
     count: 0,
     timer: null
@@ -9618,12 +9319,13 @@ function FluxApp() {
       safeMode: safeMode,
       toastPos: toastPos,
       username: username,
+      quickPlay: quickPlay,
       achievements: achievements,
       betHistory: betHistory.slice(-50),
       stats: stats
     };
     writeSave(saveData);
-  }, [chips, safeMode, toastPos, username, achievements, betHistory, stats]);
+  }, [chips, safeMode, toastPos, username, quickPlay, achievements, betHistory, stats]);
 
   // Track game results for achievements/stats/history
   function trackResult(event) {
@@ -9728,11 +9430,19 @@ function FluxApp() {
     setSafeMode(false);
     setToastPos("bottom-right");
     setUsername("");
+    setEditUsername("");
+    setQuickPlay(false);
     setAchievements([]);
     setBetHistory([]);
     setStats(DEFAULT_SAVE.stats);
     setShowResetConfirm(false);
     setShowSettings(false);
+  }
+  function closeSettings() {
+    setUsername(editUsername);
+    setShowSettings(false);
+    setShowToastPicker(false);
+    setShowResetConfirm(false);
   }
 
   // Check safe mode achievement
@@ -9818,7 +9528,6 @@ function FluxApp() {
   if (game === "typingspeed") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(TypingSpeed, gp));
   if (game === "keno") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Keno, gp));
   if (game === "crash") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Crash, gp));
-  if (game === "wheel") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Wheel, gp));
   if (game === "tower") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Tower, gp));
   if (game === "coinflip") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(CoinFlip, gp));
   if (game === "videopoker") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(VideoPoker, gp));
@@ -9925,15 +9634,7 @@ function FluxApp() {
       letterSpacing: 0.4,
       fontWeight: 500
     }
-  }, safeMode ? "22 Games · Pure Skill" : "22 Games · Always Shifting"), username && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "var(--neon)",
-      fontFamily: "'JetBrains Mono',monospace",
-      marginBottom: 8,
-      opacity: 0.7
-    }
-  }, "👤 " + username), !safeMode && /*#__PURE__*/React.createElement("div", {
+  }, safeMode ? "23 Games · Pure Skill" : "23 Games · Always Shifting"), !safeMode && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -9972,7 +9673,8 @@ function FluxApp() {
         setGame(g.id);
       },
       animDelay: i * 100,
-      isWide: isWide
+      isWide: isWide,
+      quickPlay: quickPlay
     });
   })), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -9986,6 +9688,7 @@ function FluxApp() {
     }
   }, safeMode ? "All games are skill-based" : "All games use virtual chips · No real money")), splash === "done" && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
+      setEditUsername(username);
       setShowSettings(true);
     },
     style: {
@@ -10007,7 +9710,164 @@ function FluxApp() {
       boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
       opacity: 0.6
     }
-  }, "\u2699\uFE0F"), showSettings && /*#__PURE__*/React.createElement("div", {
+  }, "\u2699\uFE0F"), splash === "done" && username && /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowProfile(true);
+    },
+    style: {
+      position: "fixed",
+      bottom: isWide ? 22 : 18,
+      left: isWide ? 22 : 18,
+      height: isWide ? 50 : 44,
+      borderRadius: 22,
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "0 14px 0 10px",
+      fontSize: 13,
+      color: "var(--neon)",
+      zIndex: 50,
+      backdropFilter: "blur(8px)",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+      fontFamily: "'JetBrains Mono',monospace",
+      fontWeight: 700,
+      opacity: 0.7
+    }
+  }, "👤 " + username), showProfile && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 200,
+      display: "flex",
+      alignItems: "flex-end",
+      justifyContent: "flex-start",
+      padding: isWide ? 22 : 18,
+      paddingBottom: isWide ? 80 : 70
+    },
+    onClick: function (e) {
+      if (e.target === e.currentTarget) setShowProfile(false);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      borderRadius: 16,
+      padding: "18px 20px",
+      width: "min(320px, 85vw)",
+      animation: "fadeUp 0.25s",
+      backdropFilter: "blur(16px)",
+      boxShadow: "0 12px 40px rgba(0,0,0,0.5)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Playfair Display',serif",
+      fontSize: 18,
+      fontWeight: 900,
+      fontStyle: "italic",
+      color: "var(--text)"
+    }
+  }, "👤 " + (username || "Player")), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowProfile(false);
+    },
+    style: {
+      width: 28,
+      height: 28,
+      borderRadius: 7,
+      background: "var(--surface2)",
+      border: "1px solid var(--border)",
+      color: "var(--dim)",
+      fontSize: 14,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, "✕")), function () {
+    var s = stats;
+    var wins = (s.gamesPlayed || 0) - (s.totalLost ? Math.round(s.gamesPlayed * s.totalLost / (s.totalWon + s.totalLost)) : 0);
+    var winRate = s.gamesPlayed > 0 ? Math.round((s.longestWinStreak > 0 ? s.totalWon / (s.totalWon + s.totalLost) : 0) * 100) : 0;
+    var netProfit = (s.totalWon || 0) - (s.totalLost || 0);
+    var items = [["🎮", "Games Played", s.gamesPlayed || 0], ["📊", "Win Rate", winRate + "%"], ["🪙", "Chips", chips], ["💰", "Net Profit", (netProfit >= 0 ? "+" : "") + netProfit], ["🏆", "Best Win", "+" + (s.biggestWin || 0)], ["🔥", "Best Streak", s.longestWinStreak || 0], ["⭐", "Achievements", (achievements || []).length + "/" + ACHIEVEMENTS.length]];
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 6
+      }
+    }, items.map(function (item, i) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: i,
+        style: {
+          padding: "8px 10px",
+          background: "var(--surface2)",
+          borderRadius: 8,
+          border: "1px solid var(--border)",
+          gridColumn: i === 0 ? "1 / -1" : "auto"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: "var(--dim)",
+          fontWeight: 600,
+          marginBottom: 2
+        }
+      }, item[0] + " " + item[1]), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 14,
+          fontWeight: 800,
+          color: i === 3 ? netProfit >= 0 ? "var(--green)" : "var(--accent)" : "var(--neon2)",
+          fontFamily: "'JetBrains Mono',monospace"
+        }
+      }, item[2]));
+    }));
+  }(), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowProfile(false);
+      setShowStats(true);
+    },
+    style: {
+      flex: 1,
+      padding: "8px",
+      borderRadius: 8,
+      fontSize: 11,
+      fontWeight: 700,
+      background: "var(--surface2)",
+      color: "var(--dim)",
+      border: "1px solid var(--border)",
+      textAlign: "center"
+    }
+  }, "\uD83D\uDCCA Full Stats"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowProfile(false);
+      setShowAchievements(true);
+    },
+    style: {
+      flex: 1,
+      padding: "8px",
+      borderRadius: 8,
+      fontSize: 11,
+      fontWeight: 700,
+      background: "var(--surface2)",
+      color: "var(--dim)",
+      border: "1px solid var(--border)",
+      textAlign: "center"
+    }
+  }, "\uD83C\uDFC6 Achievements")))), showSettings && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
@@ -10019,11 +9879,7 @@ function FluxApp() {
       backdropFilter: "blur(4px)"
     },
     onClick: function (e) {
-      if (e.target === e.currentTarget) {
-        setShowSettings(false);
-        setShowToastPicker(false);
-        setShowResetConfirm(false);
-      }
+      if (e.target === e.currentTarget) closeSettings();
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -10054,9 +9910,7 @@ function FluxApp() {
       color: "var(--text)"
     }
   }, "⚙️ Settings"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setShowSettings(false);
-    },
+    onClick: closeSettings,
     style: {
       width: 32,
       height: 32,
@@ -10161,9 +10015,9 @@ function FluxApp() {
       color: "var(--text)"
     }
   }, "Username")), /*#__PURE__*/React.createElement("input", {
-    value: username,
+    value: editUsername,
     onChange: function (e) {
-      setUsername(e.target.value.slice(0, 20));
+      setEditUsername(e.target.value.slice(0, 20));
     },
     placeholder: "Enter a name...",
     style: {
@@ -10182,7 +10036,7 @@ function FluxApp() {
       color: "var(--dim)",
       marginTop: 4
     }
-  }, username.length + "/20 · Shows on stats & share cards")), /*#__PURE__*/React.createElement("div", {
+  }, editUsername.length + "/20 · Shows on stats & share cards")), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "14px 16px",
       background: "var(--surface2)",
@@ -10235,6 +10089,69 @@ function FluxApp() {
     }
   }, toastPos === "bottom-right" ? "↘ Bottom Right" : toastPos === "bottom-left" ? "↙ Bottom Left" : toastPos === "top-right" ? "↗ Top Right" : "↖ Top Left"))), /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "14px 16px",
+      background: "var(--surface2)",
+      borderRadius: 12,
+      border: "1px solid var(--border)",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "⚡"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: "var(--text)"
+    }
+  }, "Quick Play")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      lineHeight: 1.4,
+      maxWidth: 200
+    }
+  }, "Skip game card animations.")), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setQuickPlay(function (q) {
+        return !q;
+      });
+    },
+    style: {
+      width: 48,
+      height: 28,
+      borderRadius: 14,
+      background: quickPlay ? "var(--green)" : "var(--surface)",
+      border: quickPlay ? "2px solid var(--green)" : "2px solid var(--border)",
+      position: "relative",
+      transition: "all 0.3s",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 20,
+      height: 20,
+      borderRadius: "50%",
+      background: "#fff",
+      position: "absolute",
+      top: 2,
+      left: quickPlay ? 24 : 2,
+      transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
       gap: 8,
@@ -10242,6 +10159,7 @@ function FluxApp() {
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: function () {
+      setUsername(editUsername);
       setShowAchievements(true);
       setShowSettings(false);
     },
@@ -10257,6 +10175,7 @@ function FluxApp() {
     }
   }, "\uD83C\uDFC6 Achievements"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
+      setUsername(editUsername);
       setShowStats(true);
       setShowSettings(false);
     },
@@ -10272,6 +10191,7 @@ function FluxApp() {
     }
   }, "\uD83D\uDCCA Stats & History"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
+      setUsername(editUsername);
       setShowInfo(true);
       setShowSettings(false);
     },
@@ -10319,9 +10239,7 @@ function FluxApp() {
       textAlign: "center"
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setShowSettings(false);
-    },
+    onClick: closeSettings,
     style: {
       padding: "10px 32px",
       borderRadius: 10,
@@ -10526,7 +10444,8 @@ function Wrap({
     style: {
       position: "fixed",
       inset: "-50px",
-      zIndex: 0
+      zIndex: 0,
+      overflow: "hidden"
     }
   }, /*#__PURE__*/React.createElement(Starfield, null)), /*#__PURE__*/React.createElement("div", {
     style: {
