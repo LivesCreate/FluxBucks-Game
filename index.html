@@ -6,55 +6,22 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#050508">
-<meta name="mobile-web-app-capable" content="yes">
 <title>Flux</title>
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="icon" type="image/png" href="icon-192.png">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body,#root{width:100%;height:100%;overflow-x:hidden;background:#050508;color:#e0e0e8}
-html{-webkit-text-size-adjust:100%;touch-action:manipulation}
-body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;position:fixed;inset:0;overflow:auto}
-#root{min-height:100vh;min-height:100dvh}
-input,button,textarea,select{font:inherit;color:inherit;background:none;border:none;outline:none;-webkit-appearance:none}
-button{cursor:pointer;-webkit-tap-highlight-color:transparent}
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#333;border-radius:4px}
-input[type="range"]{-webkit-appearance:none;height:6px;border-radius:3px;background:#2a2a40}
-input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.3)}
-@supports(padding: env(safe-area-inset-bottom)){body{padding-bottom:env(safe-area-inset-bottom);padding-top:env(safe-area-inset-top)}}
-#flux-loader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#050508;z-index:9999;font-family:system-ui,sans-serif}
-#flux-loader div{text-align:center}
-#flux-loader .icon{font-size:42px;margin-bottom:12px}
-#flux-loader .ver{font-size:11px;color:#666;margin-top:8px;font-family:monospace}
-</style>
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation}body{min-height:100vh;min-height:100dvh}</style>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 </head>
 <body>
-<div id="root">
-  <div id="flux-loader"><div><div class="icon">✦</div><div class="ver">Loading...</div></div></div>
-</div>
+<div id="root"></div>
 <script>
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.getRegistrations().then(function(regs){
-    for(var i=0;i<regs.length;i++) regs[i].unregister();
-  });
-}
-</script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script>
-if(typeof React==='undefined'||typeof ReactDOM==='undefined'){
-  document.getElementById('flux-loader').innerHTML='<div><div class="icon">⚠️</div><div style="color:#ff5e78;font-weight:700;margin-bottom:8px">Failed to load</div><div style="color:#888;font-size:13px;max-width:280px">React CDN could not be reached.<br>Check your internet connection and reload.</div><div style="margin-top:16px"><button onclick="location.reload()" style="padding:10px 24px;border-radius:10px;background:#8b5cf6;color:#fff;font-weight:700;border:none;cursor:pointer">Reload</button></div></div>';
-}else{
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 const {
   useState,
   useEffect,
   useRef,
   useCallback
 } = React;
-const VERSION = "v3.2.0";
+const VERSION = "v4.1.0";
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -136,7 +103,7 @@ const SLOT_PAY = {
   "🎰": 40
 };
 const CSS = `
-:root{--bg:#0a0a0f;--surface:#12121cdd;--surface2:#1a1a2edd;--border:#2a2a40;--neon:#ff8c42;--neon2:#ffcf56;--accent:#ff5e78;--cool:#56c1ff;--green:#4ade80;--text:#e8e8f0;--dim:#6b6b80;--card:#fdfaf5}
+:root{--bg:#050508;--surface:rgba(14,14,28,0.85);--surface2:rgba(22,22,42,0.65);--border:rgba(255,255,255,0.06);--neon:#c084fc;--neon2:#818cf8;--accent:#ff5e78;--cool:#56c1ff;--green:#4ade80;--text:#e0e0e8;--dim:#6b6b80;--card:#fdfaf5}
 *{box-sizing:border-box;margin:0;padding:0}
 @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
@@ -156,6 +123,7 @@ const CSS = `
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 @keyframes reelDrop{from{transform:translateY(-14px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes staggerPop{0%{opacity:0;transform:scale(0.3) translateY(35px)}50%{transform:scale(1.16) translateY(-8px)}75%{transform:scale(0.95) translateY(2px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes packScroll{0%{transform:translateX(0) translateY(-50%)}100%{transform:translateX(-1480px) translateY(-50%)}}
 @keyframes toastSlideInBR{0%{opacity:0;transform:translateX(100%) scale(0.8)}100%{opacity:1;transform:translateX(0) scale(1)}}
 @keyframes toastSlideOutBR{0%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(100%)}}
 @keyframes toastSlideInBL{0%{opacity:0;transform:translateX(-100%) scale(0.8)}100%{opacity:1;transform:translateX(0) scale(1)}}
@@ -167,6 +135,12 @@ const CSS = `
 @keyframes toastPop{0%{opacity:0;transform:scale(0.7)}60%{opacity:1;transform:scale(1.04)}100%{opacity:1;transform:scale(1)}}
 @keyframes achieveGlow{0%{box-shadow:0 0 8px rgba(255,207,86,0.3)}50%{box-shadow:0 0 24px rgba(255,207,86,0.6)}100%{box-shadow:0 0 8px rgba(255,207,86,0.3)}}
 @keyframes countUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes levelBurst{0%{opacity:0;transform:scale(0.3)}40%{opacity:1;transform:scale(1.15)}60%{transform:scale(0.95)}80%{transform:scale(1.05)}100%{transform:scale(1)}}
+@keyframes levelGlow{0%,100%{text-shadow:0 0 20px rgba(255,215,0,0.5),0 0 40px rgba(255,215,0,0.3)}50%{text-shadow:0 0 40px rgba(255,215,0,0.8),0 0 80px rgba(255,215,0,0.5),0 0 120px rgba(255,215,0,0.3)}}
+@keyframes levelRing{0%{transform:scale(0.5);opacity:0}50%{opacity:0.6}100%{transform:scale(2.5);opacity:0}}
+@keyframes levelFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes levelSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes xpBarFill{from{width:0%}to{width:var(--fill-pct)}}
 button{font-family:'Outfit',sans-serif;cursor:pointer;border:none;transition:all 0.22s cubic-bezier(0.34,1.56,0.64,1)}
 button:hover:not(:disabled){transform:translateY(-2px) scale(1.03);filter:brightness(1.12)}
 button:active:not(:disabled){transform:translateY(1px) scale(0.97)}
@@ -182,8 +156,13 @@ var DEFAULT_SAVE = {
   toastPos: "bottom-right",
   username: "",
   quickPlay: false,
+  theme: "default",
+  soundOn: true,
+  avatar: "👤",
   achievements: [],
   betHistory: [],
+  balanceHistory: [],
+  collection: [],
   stats: {
     gamesPlayed: 0,
     totalWagered: 0,
@@ -198,7 +177,12 @@ var DEFAULT_SAVE = {
     perGame: {}
   },
   bestTypingWpm: 0,
-  bestReaction: null
+  bestReaction: null,
+  xp: 0,
+  lastPlayDate: null,
+  dailyStreak: 0,
+  bestDailyStreak: 0,
+  longestSession: 0
 };
 function loadSave() {
   try {
@@ -219,6 +203,307 @@ function resetSave() {
   try {
     localStorage.removeItem(SAVE_KEY);
   } catch (e) {}
+}
+
+/* ═══ SOUND SYSTEM ═══════════════════════════════════════════════ */
+var _audioCtx = null;
+function getAudio() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+function playSound(type) {
+  try {
+    if (window.__fluxSoundOff) return;
+    var ctx = getAudio();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.value = 0.08;
+    if (type === "win") {
+      osc.frequency.value = 523;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+      var o2 = ctx.createOscillator();
+      var g2 = ctx.createGain();
+      o2.connect(g2);
+      g2.connect(ctx.destination);
+      o2.frequency.value = 659;
+      o2.type = "sine";
+      g2.gain.setValueAtTime(0.08, ctx.currentTime + 0.1);
+      g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      o2.start(ctx.currentTime + 0.1);
+      o2.stop(ctx.currentTime + 0.5);
+    } else if (type === "lose") {
+      osc.frequency.value = 220;
+      osc.type = "sawtooth";
+      gain.gain.setValueAtTime(0.06, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } else if (type === "click") {
+      osc.frequency.value = 800;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.08);
+    } else if (type === "flip") {
+      osc.frequency.value = 600;
+      osc.type = "triangle";
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+    } else if (type === "cash") {
+      osc.frequency.value = 440;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.06, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(880, ctx.currentTime + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } else if (type === "reveal") {
+      osc.frequency.value = 350 + Math.random() * 300;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.12);
+    } else if (type === "jackpot") {
+      [523, 659, 784, 1047].forEach(function (f, i) {
+        var o = ctx.createOscillator();
+        var g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.frequency.value = f;
+        o.type = "sine";
+        g.gain.setValueAtTime(0.08, ctx.currentTime + i * 0.12);
+        g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.12 + 0.4);
+        o.start(ctx.currentTime + i * 0.12);
+        o.stop(ctx.currentTime + i * 0.12 + 0.4);
+      });
+    }
+  } catch (e) {}
+}
+
+/* ═══ THEME SYSTEM ═══════════════════════════════════════════════ */
+var THEMES = {
+  "default": {
+    name: "Cosmic",
+    bg: "#050508",
+    surface: "rgba(14,14,28,0.85)",
+    surface2: "rgba(22,22,42,0.65)",
+    border: "rgba(255,255,255,0.06)",
+    text: "#e0e0e8",
+    dim: "#6b6b80",
+    neon: "#c084fc",
+    neon2: "#818cf8",
+    accent: "#ff5e78",
+    green: "#4ade80",
+    cool: "#56c1ff"
+  },
+  "midnight": {
+    name: "Midnight",
+    bg: "#020818",
+    surface: "rgba(8,16,40,0.85)",
+    surface2: "rgba(14,24,56,0.65)",
+    border: "rgba(60,100,200,0.12)",
+    text: "#d0d8f0",
+    dim: "#5a6a90",
+    neon: "#60a5fa",
+    neon2: "#818cf8",
+    accent: "#f472b6",
+    green: "#34d399",
+    cool: "#38bdf8"
+  },
+  "oled": {
+    name: "OLED Black",
+    bg: "#000000",
+    surface: "rgba(8,8,8,0.9)",
+    surface2: "rgba(18,18,18,0.7)",
+    border: "rgba(255,255,255,0.05)",
+    text: "#e8e8e8",
+    dim: "#555",
+    neon: "#a78bfa",
+    neon2: "#818cf8",
+    accent: "#ff5e78",
+    green: "#4ade80",
+    cool: "#56c1ff"
+  },
+  "emerald": {
+    name: "Emerald",
+    bg: "#040f08",
+    surface: "rgba(8,24,14,0.85)",
+    surface2: "rgba(12,36,20,0.65)",
+    border: "rgba(74,222,128,0.1)",
+    text: "#d0f0dc",
+    dim: "#4a8060",
+    neon: "#4ade80",
+    neon2: "#34d399",
+    accent: "#f97316",
+    green: "#4ade80",
+    cool: "#2dd4bf"
+  },
+  "crimson": {
+    name: "Casino Red",
+    bg: "#0a0204",
+    surface: "rgba(28,8,12,0.85)",
+    surface2: "rgba(42,12,18,0.65)",
+    border: "rgba(255,94,120,0.1)",
+    text: "#f0d8dc",
+    dim: "#8a5060",
+    neon: "#ff5e78",
+    neon2: "#fb7185",
+    accent: "#fbbf24",
+    green: "#4ade80",
+    cool: "#f472b6"
+  }
+};
+function applyTheme(id) {
+  var t = THEMES[id] || THEMES["default"];
+  var r = document.documentElement.style;
+  r.setProperty("--bg", t.bg);
+  r.setProperty("--surface", t.surface);
+  r.setProperty("--surface2", t.surface2);
+  r.setProperty("--border", t.border);
+  r.setProperty("--text", t.text);
+  r.setProperty("--dim", t.dim);
+  r.setProperty("--neon", t.neon);
+  r.setProperty("--neon2", t.neon2);
+  r.setProperty("--accent", t.accent);
+  r.setProperty("--green", t.green);
+  r.setProperty("--cool", t.cool);
+  document.body.style.background = t.bg;
+}
+
+/* ═══ AVATAR OPTIONS ════════════════════════════════════════════ */
+var AVATARS = ["👤", "😎", "🎮", "🎰", "💎", "🔥", "⚡", "🌟", "👑", "🐉", "🦊", "🐺", "🎭", "🤖", "👾", "🎯", "💀", "🦅", "🐱", "🎪"];
+
+/* ═══ XP & LEVEL SYSTEM ═════════════════════════════════════════ */
+var LEVEL_TITLES = [{
+  min: 1,
+  title: "Rookie",
+  color: "#a0a0a0"
+}, {
+  min: 5,
+  title: "Regular",
+  color: "#56c1ff"
+}, {
+  min: 10,
+  title: "Veteran",
+  color: "#4ade80"
+}, {
+  min: 15,
+  title: "Expert",
+  color: "#c084fc"
+}, {
+  min: 20,
+  title: "Master",
+  color: "#fbbf24"
+}, {
+  min: 30,
+  title: "Legend",
+  color: "#ff5e78"
+}, {
+  min: 40,
+  title: "Flux God",
+  color: "#e5e4e2"
+}];
+var XP_WIN = {
+  blackjack: 18,
+  highlow: 18,
+  baccarat: 18,
+  videopoker: 18,
+  slots: 15,
+  dice: 15,
+  limbo: 15,
+  keno: 15,
+  crash: 15,
+  scarab: 15,
+  plinko: 15,
+  coinflip: 15,
+  mines: 20,
+  tower: 20,
+  ladder: 20,
+  chicken: 20,
+  memory: 25,
+  reaction: 25,
+  colormatch: 25,
+  mathrush: 25,
+  emojihunt: 25,
+  sequence: 25,
+  wordscramble: 25,
+  aimtrainer: 25,
+  typingspeed: 25,
+  packs: 10
+};
+function getXpForLevel(lvl) {
+  return lvl * 50;
+}
+function getTotalXpForLevel(lvl) {
+  var total = 0;
+  for (var i = 1; i < lvl; i++) total += getXpForLevel(i);
+  return total;
+}
+function getLevelInfo(xp) {
+  xp = Math.max(0, xp || 0);
+  var lvl = 1;
+  var accum = 0;
+  while (lvl < 50) {
+    var needed = getXpForLevel(lvl);
+    if (accum + needed > xp) break;
+    accum += needed;
+    lvl++;
+  }
+  var xpInLevel = xp - accum;
+  var xpForNext = getXpForLevel(lvl);
+  var progress = lvl >= 50 ? 1 : Math.min(1, xpInLevel / xpForNext);
+  var titleInfo = LEVEL_TITLES[0];
+  for (var i = LEVEL_TITLES.length - 1; i >= 0; i--) {
+    if (lvl >= LEVEL_TITLES[i].min) {
+      titleInfo = LEVEL_TITLES[i];
+      break;
+    }
+  }
+  return {
+    level: lvl,
+    title: titleInfo.title,
+    titleColor: titleInfo.color,
+    xpInLevel: xpInLevel,
+    xpForNext: xpForNext,
+    progress: progress
+  };
+}
+function calcXpChange(event, stats) {
+  if (event.type === "win") {
+    return XP_WIN[event.game] || 15;
+  } else if (event.type === "lose") {
+    var pg = stats.perGame && stats.perGame[event.game] || {};
+    var gameLoseStreak = pg.currentLoseStreak || 1;
+    return -Math.min(10, 4 + gameLoseStreak);
+  }
+  return 0;
+}
+var DAILY_BONUS = [0, 50, 100, 200, 300, 400, 500, 500];
+function getDailyBonus(streak) {
+  return DAILY_BONUS[Math.min(streak, DAILY_BONUS.length - 1)] || 500;
+}
+function getTodayDateStr() {
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function formatSessionTime(secs) {
+  secs = Math.floor(secs || 0);
+  var h = Math.floor(secs / 3600);
+  var m = Math.floor(secs % 3600 / 60);
+  var s = secs % 60;
+  if (h > 0) return h + "h " + m + "m " + s + "s";
+  if (m > 0) return m + "m " + s + "s";
+  return s + "s";
 }
 
 /* ═══════════ ACHIEVEMENTS ═══════════════════════════════════════ */
@@ -475,6 +760,48 @@ var ACHIEVEMENTS = [{
   hint: "Bet on tie and have it hit",
   tier: "gold"
 }, {
+  id: "chicken_5",
+  name: "Chicken Dinner",
+  desc: "Reveal 5+ safe tiles in Chicken",
+  icon: "🐔",
+  hint: "Pick 5 safe tiles without hitting a bone",
+  tier: "silver"
+}, {
+  id: "chicken_12",
+  name: "Brave Bird",
+  desc: "Reveal 12+ safe tiles in Chicken",
+  icon: "🦅",
+  hint: "Pick 12 safe tiles in one round",
+  tier: "gold"
+}, {
+  id: "pack_legendary",
+  name: "Legendary Pull",
+  desc: "Pull a Legendary item from a Pack",
+  icon: "✨",
+  hint: "Get lucky with a pack opening",
+  tier: "gold"
+}, {
+  id: "scarab_free",
+  name: "Free Spins",
+  desc: "Trigger free spins in Scarab Spin",
+  icon: "🪲",
+  hint: "Land 3+ scatter symbols",
+  tier: "silver"
+}, {
+  id: "scarab_big",
+  name: "Pharaoh's Fortune",
+  desc: "Win 20x+ in Scarab Spin",
+  icon: "🏛️",
+  hint: "Hit a massive multiplier",
+  tier: "gold"
+}, {
+  id: "collector_10",
+  name: "Collector",
+  desc: "Collect 10 unique items",
+  icon: "📦",
+  hint: "Open packs to build your collection",
+  tier: "silver"
+}, {
   id: "ladder_5",
   name: "Climber",
   desc: "Reach rung 5 in Coin Ladder",
@@ -562,6 +889,12 @@ function checkAchievements(save, event) {
   if (event.game === "crash" && event.mult >= 50) add("crash_50x");
   if (event.game === "tower" && event.mult >= 30) add("tower_clear");
   if (event.game === "coinflip" && s.currentWinStreak >= 5) add("flip_streak_5");
+  if (event.game === "chicken" && event.revealed >= 5) add("chicken_5");
+  if (event.game === "chicken" && event.revealed >= 12) add("chicken_12");
+  if (event.game === "packs" && event.rarity === "legendary") add("pack_legendary");
+  if (event.game === "scarab" && event.freeSpins) add("scarab_free");
+  if (event.game === "scarab" && event.mult >= 20) add("scarab_big");
+  if (event.collectionSize >= 10) add("collector_10");
   if (event.safeMode) add("safe_mode");
   if (s.totalWagered >= 1000) add("wagered_1k");
   if (s.totalWagered >= 10000) add("wagered_10k");
@@ -843,12 +1176,19 @@ function StatsPage({
   achievements,
   chips,
   username,
+  balanceHistory,
+  xp,
+  dailyStreak,
+  bestDailyStreak,
+  sessionSeconds,
+  longestSession,
   onClose
 }) {
   var s = stats || DEFAULT_SAVE.stats;
   var winRate = s.gamesPlayed > 0 ? Math.round(s.totalWon / s.gamesPlayed * 100) : 0;
   var netProfit = 0;
   for (var i = 0; i < (betHistory || []).length; i++) netProfit += betHistory[i].profit || 0;
+  var li = getLevelInfo(xp || 0);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -907,13 +1247,64 @@ function StatsPage({
   }, "✕")), username && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
-      marginBottom: 12,
+      marginBottom: 8,
       fontSize: 14,
       fontWeight: 700,
       color: "var(--neon)",
       fontFamily: "'JetBrains Mono',monospace"
     }
   }, "👤 " + username), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px",
+      background: "var(--surface2)",
+      borderRadius: 10,
+      border: "1px solid var(--border)",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: li.titleColor,
+      fontFamily: "'JetBrains Mono',monospace"
+    }
+  }, "Lv." + li.level + " " + li.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      fontFamily: "'JetBrains Mono',monospace"
+    }
+  }, (xp || 0) + " XP total")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "100%",
+      height: 8,
+      background: "var(--surface)",
+      borderRadius: 4,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: li.progress * 100 + "%",
+      height: "100%",
+      background: "linear-gradient(90deg," + li.titleColor + "," + li.titleColor + "88)",
+      borderRadius: 4,
+      transition: "width 0.5s"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--dim)",
+      marginTop: 4,
+      textAlign: "right"
+    }
+  }, li.level < 50 ? li.xpInLevel + " / " + li.xpForNext + " XP to next level" : "Max level reached!")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
@@ -1046,7 +1437,91 @@ function StatsPage({
       color: "var(--dim)",
       fontWeight: 600
     }
-  }, "BEST STREAK"))), /*#__PURE__*/React.createElement("div", {
+  }, "BEST STREAK")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px",
+      background: "var(--surface2)",
+      borderRadius: 10,
+      border: "1px solid var(--border)",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontWeight: 900,
+      color: "var(--accent)",
+      fontFamily: "'JetBrains Mono',monospace"
+    }
+  }, dailyStreak || 0), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--dim)",
+      fontWeight: 600
+    }
+  }, "DAILY STREAK")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px",
+      background: "var(--surface2)",
+      borderRadius: 10,
+      border: "1px solid var(--border)",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontWeight: 900,
+      color: "var(--accent)",
+      fontFamily: "'JetBrains Mono',monospace"
+    }
+  }, bestDailyStreak || 0), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--dim)",
+      fontWeight: 600
+    }
+  }, "BEST DAILY STREAK")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px",
+      background: "var(--surface2)",
+      borderRadius: 10,
+      border: "1px solid var(--border)",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 900,
+      color: "var(--cool)",
+      fontFamily: "'JetBrains Mono',monospace"
+    }
+  }, formatSessionTime(sessionSeconds || 0)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--dim)",
+      fontWeight: 600
+    }
+  }, "SESSION TIME")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px",
+      background: "var(--surface2)",
+      borderRadius: 10,
+      border: "1px solid var(--border)",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 900,
+      color: "var(--cool)",
+      fontFamily: "'JetBrains Mono',monospace"
+    }
+  }, formatSessionTime(longestSession || 0)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--dim)",
+      fontWeight: 600
+    }
+  }, "LONGEST SESSION"))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       fontWeight: 700,
@@ -1155,7 +1630,9 @@ function StatsPage({
       gap: 8,
       justifyContent: "center"
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(BalanceGraph, {
+    history: balanceHistory
+  }), /*#__PURE__*/React.createElement("button", {
     id: "copyStatsBtn",
     onClick: function () {
       if (navigator.clipboard) {
@@ -8360,6 +8837,1199 @@ function Baccarat({
     title: "Baccarat Guide"
   }));
 }
+
+/* ═══ GAME: CHICKEN ══════════════════════════════════════════════ */
+var CK_G = [{
+  t: "Pick Tiles",
+  d: "A 5x5 grid hides bones. Each safe tile you reveal increases your multiplier."
+}, {
+  t: "Cash Out",
+  d: "Cash out anytime after revealing a tile. The more you reveal, the bigger the payout."
+}, {
+  t: "Bones",
+  d: "Hit a bone and lose your bet. Set how many bones (1-12) before starting — more bones = higher multipliers."
+}];
+function Chicken({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [bones, setBones] = useState(3);
+  var [phase, setPhase] = useState("idle");
+  var [grid, setGrid] = useState([]);
+  var [revealed, setRevealed] = useState([]);
+  var [result, setResult] = useState(null);
+  var [activeBet, setActiveBet] = useState(0);
+  var TOTAL = 25;
+  function startGame() {
+    if (phase === "playing") return;
+    function doIt() {
+      doStart();
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doStart();
+  }
+  function doStart() {
+    var g = Array(TOTAL).fill(false);
+    var placed = 0;
+    while (placed < bones) {
+      var idx = Math.floor(Math.random() * TOTAL);
+      if (!g[idx]) {
+        g[idx] = true;
+        placed++;
+      }
+    }
+    setActiveBet(bet);
+    setChips(function (c) {
+      return c - bet;
+    });
+    setGrid(g);
+    setRevealed([]);
+    setResult(null);
+    setPhase("playing");
+    playSound("click");
+  }
+  function calcMult(safe) {
+    if (safe === 0) return 1;
+    var m = 1;
+    for (var i = 0; i < safe; i++) {
+      m *= (TOTAL - i) / (TOTAL - bones - i);
+    }
+    return Math.max(1, parseFloat((m * 0.97).toFixed(2)));
+  }
+  function pick(idx) {
+    if (phase !== "playing" || revealed.indexOf(idx) >= 0) return;
+    var newRev = revealed.concat([idx]);
+    setRevealed(newRev);
+    if (grid[idx]) {
+      setPhase("dead");
+      playSound("lose");
+      setResult({
+        type: "lose",
+        text: "🍗 Hit a bone! -" + activeBet
+      });
+      if (trackResult) trackResult({
+        type: "lose",
+        game: "chicken",
+        bet: activeBet,
+        profit: -activeBet,
+        revealed: newRev.length - 1
+      });
+    } else {
+      playSound("reveal");
+      var safeCount = newRev.filter(function (i) {
+        return !grid[i];
+      }).length;
+      if (safeCount >= TOTAL - bones) {
+        var mult = calcMult(safeCount);
+        var payout = Math.floor(activeBet * mult);
+        setPhase("idle");
+        playSound("jackpot");
+        setChips(function (c) {
+          return c + payout;
+        });
+        setResult({
+          type: "win",
+          text: "Cleared all! " + mult + "x = +" + (payout - activeBet)
+        });
+        if (trackResult) trackResult({
+          type: "win",
+          game: "chicken",
+          bet: activeBet,
+          profit: payout - activeBet,
+          revealed: safeCount
+        });
+      }
+    }
+  }
+  function cashOut() {
+    if (phase !== "playing") return;
+    var safeCount = revealed.filter(function (i) {
+      return !grid[i];
+    }).length;
+    if (safeCount === 0) return;
+    var mult = calcMult(safeCount);
+    var payout = Math.floor(activeBet * mult);
+    setPhase("idle");
+    playSound("cash");
+    setChips(function (c) {
+      return c + payout;
+    });
+    setResult({
+      type: "win",
+      text: "Cashed at " + mult + "x! +" + (payout - activeBet)
+    });
+    if (trackResult) trackResult({
+      type: "win",
+      game: "chicken",
+      bet: activeBet,
+      profit: payout - activeBet,
+      revealed: safeCount
+    });
+  }
+  var safeCount = phase === "playing" ? revealed.filter(function (i) {
+    return !grid[i];
+  }).length : 0;
+  var curMult = calcMult(safeCount);
+  var canStart = phase !== "playing";
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "🐔 Chicken",
+    titleColor: "#fbbf24",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, phase === "playing" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontWeight: 900,
+      fontFamily: "'JetBrains Mono',monospace",
+      color: "var(--neon2)",
+      marginBottom: 8
+    }
+  }, curMult.toFixed(2), "x"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(5, 1fr)",
+      gap: 4,
+      maxWidth: 280,
+      margin: "0 auto 12px"
+    }
+  }, Array.from({
+    length: TOTAL
+  }).map(function (_, i) {
+    var isRevealed = revealed.indexOf(i) >= 0;
+    var isBone = grid[i];
+    var showBone = isRevealed && isBone;
+    var showSafe = isRevealed && !isBone;
+    var showAllBones = phase === "dead";
+    var bg = showSafe ? "rgba(74,222,128,0.25)" : showBone ? "rgba(255,94,120,0.25)" : showAllBones && isBone ? "rgba(255,94,120,0.12)" : "var(--surface2)";
+    var borderC = showSafe ? "var(--green)" : showBone ? "var(--accent)" : "var(--border)";
+    return /*#__PURE__*/React.createElement("button", {
+      key: i,
+      onClick: function () {
+        pick(i);
+      },
+      disabled: phase !== "playing" || isRevealed,
+      style: {
+        width: "100%",
+        aspectRatio: "1",
+        borderRadius: 8,
+        background: bg,
+        border: "2px solid " + borderC,
+        cursor: phase === "playing" && !isRevealed ? "pointer" : "default",
+        fontSize: 18,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 0.15s"
+      }
+    }, showSafe ? "🐔" : showBone ? "🍗" : showAllBones && isBone ? "🍗" : "");
+  })), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    text: result.text,
+    type: result.type
+  }), phase === "playing" && safeCount > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(GameBtn, {
+    color: "var(--green)",
+    text: "Cash Out " + curMult.toFixed(2) + "x",
+    onClick: cashOut
+  })), canStart && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      fontWeight: 700
+    }
+  }, "BONES:"), [1, 3, 5, 7, 10].map(function (b) {
+    return /*#__PURE__*/React.createElement("button", {
+      key: b,
+      onClick: function () {
+        setBones(b);
+      },
+      style: {
+        padding: "4px 10px",
+        borderRadius: 6,
+        fontSize: 12,
+        fontWeight: 700,
+        background: bones === b ? "#fbbf2420" : "var(--surface2)",
+        color: bones === b ? "#fbbf24" : "var(--dim)",
+        border: bones === b ? "2px solid #fbbf24" : "1px solid var(--border)"
+      }
+    }, b);
+  })), /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#fbbf24",
+    text: "\uD83D\uDC14 Start",
+    onClick: startGame
+  })))), /*#__PURE__*/React.createElement(GameGuide, {
+    items: CK_G,
+    title: "Chicken Guide"
+  }));
+}
+
+/* ═══ GAME: PACKS / LOOTBOXES ═══════════════════════════════════ */
+var PACK_ITEMS = [{
+  name: "Bronze Coin",
+  icon: "🪙",
+  rarity: "common",
+  rate: 0.40
+}, {
+  name: "Silver Ring",
+  icon: "💍",
+  rarity: "common",
+  rate: 0.25
+}, {
+  name: "Gold Bar",
+  icon: "🏆",
+  rarity: "uncommon",
+  rate: 0.15
+}, {
+  name: "Ruby Gem",
+  icon: "♦️",
+  rarity: "uncommon",
+  rate: 0.08
+}, {
+  name: "Diamond",
+  icon: "💎",
+  rarity: "rare",
+  rate: 0.05
+}, {
+  name: "Crown",
+  icon: "👑",
+  rarity: "rare",
+  rate: 0.03
+}, {
+  name: "Dragon Egg",
+  icon: "🐉",
+  rarity: "epic",
+  rate: 0.02
+}, {
+  name: "Cosmic Star",
+  icon: "🌟",
+  rarity: "epic",
+  rate: 0.01
+}, {
+  name: "Infinity Stone",
+  icon: "♾️",
+  rarity: "legendary",
+  rate: 0.005
+}, {
+  name: "Phoenix Feather",
+  icon: "🔥",
+  rarity: "legendary",
+  rate: 0.005
+}];
+var RARITY_COLORS = {
+  common: "#aaa",
+  uncommon: "#4ade80",
+  rare: "#3b82f6",
+  epic: "#a855f7",
+  legendary: "#fbbf24"
+};
+var RARITY_CHIPS = {
+  common: 5,
+  uncommon: 15,
+  rare: 50,
+  epic: 150,
+  legendary: 500
+};
+var PK_G = [{
+  t: "Open Packs",
+  d: "Spend 25 chips to open a pack. Items range from Common to Legendary."
+}, {
+  t: "Collection",
+  d: "Collect unique items. Duplicates give bonus chips based on rarity."
+}, {
+  t: "Rarities",
+  d: "Common (40%), Uncommon (23%), Rare (8%), Epic (3%), Legendary (1%). Build your collection!"
+}];
+function rollItem() {
+  var r = Math.random(),
+    cumulative = 0;
+  for (var i = 0; i < PACK_ITEMS.length; i++) {
+    cumulative += PACK_ITEMS[i].rate;
+    if (r < cumulative) return PACK_ITEMS[i];
+  }
+  return PACK_ITEMS[0];
+}
+function buildReel(winner) {
+  var REEL_SIZE = 55;
+  var WIN_POS = 45;
+  var items = [];
+  for (var i = 0; i < REEL_SIZE; i++) {
+    if (i === WIN_POS) {
+      items.push(winner);
+    } else {
+      items.push(rollItem());
+    }
+  }
+  return {
+    items: items,
+    winPos: WIN_POS
+  };
+}
+function Packs({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult,
+  collection,
+  setCollection
+}) {
+  var [phase, setPhase] = useState("idle");
+  var [reelItems, setReelItems] = useState([]);
+  var [reelOffset, setReelOffset] = useState(0);
+  var [winPos, setWinPos] = useState(0);
+  var [finalItem, setFinalItem] = useState(null);
+  var [result, setResult] = useState(null);
+  var stripRef = useRef(null);
+  var containerRef = useRef(null);
+  var COST = 25;
+  var ITEM_W = 78;
+  var ITEM_GAP = 6;
+  var ITEM_TOTAL = ITEM_W + ITEM_GAP;
+  function openPack() {
+    if (phase !== "idle") return;
+    function doIt() {
+      doOpen();
+    }
+    if (checkDebt(COST, chips, function () {}, setDebtPopup, doIt)) return;
+    doOpen();
+  }
+  function doOpen() {
+    setPhase("rolling");
+    setResult(null);
+    setFinalItem(null);
+    playSound("click");
+    setChips(function (c) {
+      return c - COST;
+    });
+    var item = rollItem();
+    var reel = buildReel(item);
+    setReelItems(reel.items);
+    setWinPos(reel.winPos);
+    var containerW = containerRef.current ? containerRef.current.offsetWidth : 300;
+    var targetX = reel.winPos * ITEM_TOTAL - containerW / 2 + ITEM_W / 2 + (Math.random() * 20 - 10);
+    setReelOffset(0);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        setReelOffset(-targetX);
+      });
+    });
+    setTimeout(function () {
+      setFinalItem(item);
+      setPhase("reveal");
+      playSound(item.rarity === "legendary" || item.rarity === "epic" ? "jackpot" : "reveal");
+      var isDupe = collection.indexOf(item.name) >= 0;
+      if (isDupe) {
+        var bonus = RARITY_CHIPS[item.rarity] || 5;
+        setChips(function (c) {
+          return c + bonus;
+        });
+        setResult({
+          type: "win",
+          text: "Duplicate! +" + bonus + " chips"
+        });
+      } else {
+        setCollection(function (c) {
+          return c.concat([item.name]);
+        });
+        setResult({
+          type: "win",
+          text: "New: " + item.name + "!"
+        });
+      }
+      if (trackResult) trackResult({
+        type: "win",
+        game: "packs",
+        bet: COST,
+        profit: isDupe ? RARITY_CHIPS[item.rarity] - COST : -COST,
+        rarity: item.rarity,
+        collectionSize: collection.length + (isDupe ? 0 : 1)
+      });
+    }, 5200);
+  }
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "📦 Packs",
+    titleColor: "#a855f7",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, (phase === "rolling" || phase === "reveal") && /*#__PURE__*/React.createElement("div", {
+    ref: containerRef,
+    style: {
+      overflow: "hidden",
+      height: 100,
+      position: "relative",
+      borderRadius: 12,
+      background: "var(--surface2)",
+      border: "1px solid var(--border)",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: 0,
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: 0,
+      height: 0,
+      borderLeft: "8px solid transparent",
+      borderRight: "8px solid transparent",
+      borderTop: "10px solid var(--accent)",
+      zIndex: 3
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      bottom: 0,
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: 0,
+      height: 0,
+      borderLeft: "8px solid transparent",
+      borderRight: "8px solid transparent",
+      borderBottom: "10px solid var(--accent)",
+      zIndex: 3
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: 2,
+      background: "var(--accent)",
+      opacity: 0.4,
+      zIndex: 2
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    ref: stripRef,
+    style: {
+      display: "flex",
+      gap: ITEM_GAP,
+      position: "absolute",
+      top: "50%",
+      left: 0,
+      transform: "translateY(-50%) translateX(" + reelOffset + "px)",
+      transition: phase === "rolling" ? "transform 5s cubic-bezier(0.15, 0.6, 0.25, 1)" : "none",
+      paddingLeft: 4
+    }
+  }, reelItems.map(function (item, i) {
+    var isWinner = phase === "reveal" && i === winPos;
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        minWidth: ITEM_W,
+        height: 80,
+        borderRadius: 10,
+        background: isWinner ? RARITY_COLORS[item.rarity] + "30" : RARITY_COLORS[item.rarity] + "12",
+        border: "2px solid " + (isWinner ? RARITY_COLORS[item.rarity] : RARITY_COLORS[item.rarity] + "60"),
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        boxShadow: isWinner ? "0 0 20px " + RARITY_COLORS[item.rarity] + "40" : "none",
+        transition: "all 0.3s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 30
+      }
+    }, item.icon), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 8,
+        fontWeight: 700,
+        color: RARITY_COLORS[item.rarity],
+        textTransform: "uppercase",
+        letterSpacing: 1
+      }
+    }, item.rarity));
+  }))), phase === "reveal" && finalItem && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12,
+      padding: 20,
+      borderRadius: 14,
+      background: RARITY_COLORS[finalItem.rarity] + "15",
+      border: "2px solid " + RARITY_COLORS[finalItem.rarity],
+      animation: "popBounce 0.5s"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 52,
+      marginBottom: 6
+    }
+  }, finalItem.icon), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 900,
+      color: RARITY_COLORS[finalItem.rarity],
+      fontFamily: "'Playfair Display',serif"
+    }
+  }, finalItem.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: RARITY_COLORS[finalItem.rarity],
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      marginTop: 2
+    }
+  }, finalItem.rarity)), phase === "idle" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 48,
+      marginBottom: 8,
+      opacity: 0.5
+    }
+  }, "\uD83D\uDCE6"), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    text: result.text,
+    type: result.type
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      marginBottom: 8
+    }
+  }, "Collection: ", collection.length, "/", PACK_ITEMS.length, " unique items"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4,
+      flexWrap: "wrap",
+      justifyContent: "center",
+      marginBottom: 10
+    }
+  }, PACK_ITEMS.map(function (item) {
+    var owned = collection.indexOf(item.name) >= 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: item.name,
+      style: {
+        fontSize: 20,
+        opacity: owned ? 1 : 0.2,
+        filter: owned ? "none" : "grayscale(1)",
+        padding: 2
+      },
+      title: item.name
+    }, item.icon);
+  })), /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#a855f7",
+    text: "📦 Open Pack (25 chips)",
+    onClick: openPack,
+    disabled: phase === "rolling" || chips < COST
+  }), phase === "reveal" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement(GameBtn, {
+    color: "var(--neon2)",
+    text: "Open Another",
+    onClick: function () {
+      setPhase("idle");
+      setFinalItem(null);
+      setResult(null);
+      setReelItems([]);
+      setReelOffset(0);
+    }
+  }))), /*#__PURE__*/React.createElement(GameGuide, {
+    items: PK_G,
+    title: "Packs Guide"
+  }));
+}
+
+/* ═══ GAME: SCARAB SPIN (5-REEL SLOT) ═══════════════════════════ */
+var SC_SYMS = ["🪲", "👁️", "🏛️", "🐍", "💎", "🌙", "⭐"];
+var SC_WILD = "🪲",
+  SC_SCATTER = "⭐";
+var SC_PAY = {
+  "👁️": 2,
+  "🏛️": 3,
+  "🐍": 5,
+  "💎": 8,
+  "🌙": 12,
+  "🪲": 15
+};
+var SC_G = [{
+  t: "5 Reels",
+  d: "Spin 5 reels with 3 rows. Match symbols on paylines to win."
+}, {
+  t: "Wild 🪲",
+  d: "Scarab is Wild — substitutes for any symbol except Scatter."
+}, {
+  t: "Scatter ⭐",
+  d: "3+ Stars trigger free spins! 3=5 spins, 4=10 spins, 5=20 spins."
+}, {
+  t: "Paylines",
+  d: "3+ matching symbols left-to-right on the center row wins. Wilds count as any symbol."
+}];
+function Scarab({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [spinning, setSpinning] = useState(false);
+  var [reels, setReels] = useState([["🪲", "👁️", "🏛️"], ["🐍", "💎", "🌙"], ["⭐", "🪲", "👁️"], ["🏛️", "🐍", "💎"], ["🌙", "⭐", "🪲"]]);
+  var [result, setResult] = useState(null);
+  var [freeSpins, setFreeSpins] = useState(0);
+  var [totalFreeWin, setTotalFreeWin] = useState(0);
+  function spinReels() {
+    var r = [];
+    for (var c = 0; c < 5; c++) {
+      var col = [];
+      for (var row = 0; row < 3; row++) col.push(SC_SYMS[Math.floor(Math.random() * SC_SYMS.length)]);
+      r.push(col);
+    }
+    return r;
+  }
+  function evalWin(r) {
+    var mid = r.map(function (c) {
+      return c[1];
+    });
+    var scatterCount = 0;
+    for (var i = 0; i < 5; i++) for (var j = 0; j < 3; j++) if (r[i][j] === SC_SCATTER) scatterCount++;
+    var matchSym = null,
+      matchLen = 0;
+    var first = mid[0] === SC_WILD ? null : mid[0];
+    for (var k = 0; k < 5; k++) {
+      var s = mid[k];
+      if (s === SC_SCATTER) break;
+      if (s === SC_WILD) {
+        matchLen++;
+        continue;
+      }
+      if (first === null) {
+        first = s;
+        matchLen++;
+      } else if (s === first) {
+        matchLen++;
+      } else break;
+    }
+    matchSym = first;
+    var mult = 0;
+    if (matchLen >= 3 && matchSym && SC_PAY[matchSym]) {
+      mult = SC_PAY[matchSym] * (matchLen - 2);
+    }
+    if (window.__fluxForceWin && mult === 0) {
+      mult = 5;
+    }
+    var fs = 0;
+    if (scatterCount >= 3) fs = scatterCount === 3 ? 5 : scatterCount === 4 ? 10 : 20;
+    return {
+      mult: mult,
+      freeSpinsWon: fs,
+      scatterCount: scatterCount
+    };
+  }
+  function doSpin() {
+    if (spinning) return;
+    var isFree = freeSpins > 0;
+    if (!isFree) {
+      function doIt() {
+        startSpin(false);
+      }
+      if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    }
+    startSpin(isFree);
+  }
+  function startSpin(isFree) {
+    setSpinning(true);
+    setResult(null);
+    playSound("click");
+    if (!isFree) setChips(function (c) {
+      return c - bet;
+    });
+    if (isFree) setFreeSpins(function (f) {
+      return f - 1;
+    });
+    setTimeout(function () {
+      var r = spinReels();
+      setReels(r);
+      var ev = evalWin(r);
+      if (ev.freeSpinsWon > 0) {
+        setFreeSpins(function (f) {
+          return f + ev.freeSpinsWon;
+        });
+      }
+      if (ev.mult > 0) {
+        var profit = Math.floor(bet * ev.mult);
+        setChips(function (c) {
+          return c + profit;
+        });
+        if (isFree) setTotalFreeWin(function (t) {
+          return t + profit;
+        });
+        setResult({
+          type: "win",
+          text: ev.mult + "x! +" + profit + (ev.freeSpinsWon > 0 ? " + " + ev.freeSpinsWon + " Free Spins!" : "")
+        });
+        playSound(ev.mult >= 10 ? "jackpot" : "win");
+        if (trackResult) trackResult({
+          type: "win",
+          game: "scarab",
+          bet: bet,
+          profit: profit,
+          mult: ev.mult,
+          freeSpins: ev.freeSpinsWon > 0
+        });
+      } else if (ev.freeSpinsWon > 0) {
+        setResult({
+          type: "win",
+          text: ev.freeSpinsWon + " Free Spins!"
+        });
+        playSound("jackpot");
+        if (trackResult) trackResult({
+          type: "win",
+          game: "scarab",
+          bet: bet,
+          profit: 0,
+          freeSpins: true
+        });
+      } else {
+        if (!isFree) setResult({
+          type: "lose",
+          text: "No match. -" + bet
+        });else setResult({
+          type: "lose",
+          text: "No match"
+        });
+        playSound("lose");
+        if (!isFree && trackResult) trackResult({
+          type: "lose",
+          game: "scarab",
+          bet: bet,
+          profit: -bet
+        });
+      }
+      setSpinning(false);
+    }, 800);
+  }
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "🪲 Scarab Spin",
+    titleColor: "#fbbf24",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, freeSpins > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8,
+      padding: "6px 14px",
+      borderRadius: 8,
+      background: "rgba(251,191,36,0.15)",
+      border: "1px solid rgba(251,191,36,0.3)",
+      display: "inline-block",
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#fbbf24"
+    }
+  }, "⭐ " + freeSpins + " Free Spin" + (freeSpins > 1 ? "s" : "") + " remaining"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(5, 1fr)",
+      gap: 3,
+      maxWidth: 300,
+      margin: "0 auto 12px",
+      background: "var(--surface2)",
+      borderRadius: 12,
+      padding: 8,
+      border: "1px solid var(--border)"
+    }
+  }, reels.map(function (col, ci) {
+    return col.map(function (sym, ri) {
+      var isCenter = ri === 1;
+      return /*#__PURE__*/React.createElement("div", {
+        key: ci + "-" + ri,
+        style: {
+          fontSize: isCenter ? 30 : 22,
+          padding: 6,
+          borderRadius: 6,
+          background: isCenter ? "rgba(255,255,255,0.04)" : "transparent",
+          opacity: isCenter ? 1 : 0.5,
+          textAlign: "center",
+          animation: spinning ? "popBounce 0.8s infinite" : "none"
+        }
+      }, sym);
+    });
+  })), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    text: result.text,
+    type: result.type
+  }), freeSpins === 0 && /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement(GameBtn, {
+    color: "#fbbf24",
+    text: freeSpins > 0 ? "⭐ Free Spin" : "🪲 Spin",
+    onClick: doSpin,
+    disabled: spinning
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 6,
+      fontSize: 10,
+      color: "var(--dim)",
+      display: "flex",
+      gap: 10,
+      justifyContent: "center",
+      flexWrap: "wrap"
+    }
+  }, Object.keys(SC_PAY).map(function (s) {
+    return /*#__PURE__*/React.createElement("span", {
+      key: s
+    }, s + " " + SC_PAY[s] + "x");
+  }))), /*#__PURE__*/React.createElement(GameGuide, {
+    items: SC_G,
+    title: "Scarab Spin Guide"
+  }));
+}
+
+/* ═══ BALANCE GRAPH ══════════════════════════════════════════════ */
+function BalanceGraph({
+  history
+}) {
+  if (!history || history.length < 2) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: 20,
+      color: "var(--dim)",
+      fontSize: 12
+    }
+  }, "Play more games to see your balance graph");
+  var data = history.slice(-50);
+  var min = Math.min.apply(null, data);
+  var max = Math.max.apply(null, data);
+  var range = max - min || 1;
+  var w = 280,
+    h = 100,
+    pad = 5;
+  var points = data.map(function (v, i) {
+    var x = pad + i / (data.length - 1) * (w - pad * 2);
+    var y = h - pad - (v - min) / range * (h - pad * 2);
+    return x + "," + y;
+  }).join(" ");
+  var lastVal = data[data.length - 1];
+  var firstVal = data[0];
+  var color = lastVal >= firstVal ? "var(--green)" : "var(--accent)";
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12,
+      padding: 12,
+      background: "var(--surface2)",
+      borderRadius: 10,
+      border: "1px solid var(--border)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "var(--dim)",
+      marginBottom: 6
+    }
+  }, "\uD83D\uDCC8 Balance History (last 50)"), /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 " + w + " " + h,
+    style: {
+      width: "100%",
+      height: 80
+    }
+  }, /*#__PURE__*/React.createElement("polyline", {
+    points: points,
+    fill: "none",
+    stroke: color,
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }), data.map(function (v, i) {
+    var x = pad + i / (data.length - 1) * (w - pad * 2);
+    var y = h - pad - (v - min) / range * (h - pad * 2);
+    return i === data.length - 1 ? /*#__PURE__*/React.createElement("circle", {
+      key: i,
+      cx: x,
+      cy: y,
+      r: "3",
+      fill: color
+    }) : null;
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 10,
+      color: "var(--dim)",
+      fontFamily: "'JetBrains Mono',monospace"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, firstVal), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: color,
+      fontWeight: 700
+    }
+  }, lastVal)));
+}
+
+/* ═══ SHARE CARD ═════════════════════════════════════════════════ */
+function ShareCard({
+  username,
+  avatar,
+  chips,
+  stats,
+  achievements,
+  onClose
+}) {
+  var canvasRef = useRef(null);
+  var [copied, setCopied] = useState(false);
+  var s = stats || {};
+  var winRate = s.gamesPlayed > 0 ? Math.round(s.totalWon / Math.max(1, s.totalWon + s.totalLost) * 100) : 0;
+  var netProfit = (s.totalWon || 0) - (s.totalLost || 0);
+  useEffect(function () {
+    var c = canvasRef.current;
+    if (!c) return;
+    var ctx = c.getContext("2d");
+    c.width = 400;
+    c.height = 260;
+    var g = ctx.createLinearGradient(0, 0, 400, 260);
+    g.addColorStop(0, "#0e0e18");
+    g.addColorStop(1, "#1a0a2e");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 400, 260);
+    ctx.fillStyle = "#c084fc";
+    ctx.font = "bold 28px serif";
+    ctx.fillText("✦ Flux", 20, 40);
+    ctx.fillStyle = "#888";
+    ctx.font = "11px monospace";
+    ctx.fillText(VERSION, 120, 40);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 20px sans-serif";
+    ctx.fillText(avatar + " " + (username || "Player"), 20, 75);
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "bold 16px monospace";
+    ctx.fillText("🪙 " + chips + " chips", 20, 105);
+    var items = [["Games", s.gamesPlayed || 0], ["Win Rate", winRate + "%"], ["Net", (netProfit >= 0 ? "+" : "") + netProfit], ["Best Win", "+" + (s.biggestWin || 0)], ["Streak", s.longestWinStreak || 0], ["Achievements", (achievements || []).length]];
+    items.forEach(function (item, i) {
+      var col = i % 3,
+        row = Math.floor(i / 3);
+      var x = 20 + col * 125,
+        y = 130 + row * 55;
+      ctx.fillStyle = "#666";
+      ctx.font = "10px sans-serif";
+      ctx.fillText(item[0], x, y);
+      ctx.fillStyle = "#e0e0e8";
+      ctx.font = "bold 18px monospace";
+      ctx.fillText("" + item[1], x, y + 20);
+    });
+    ctx.fillStyle = "#333";
+    ctx.font = "9px monospace";
+    ctx.fillText("flux casino · " + new Date().toLocaleDateString(), 20, 250);
+  }, []);
+  function copyImage() {
+    var c = canvasRef.current;
+    if (!c) return;
+    c.toBlob(function (blob) {
+      if (navigator.clipboard && navigator.clipboard.write) {
+        navigator.clipboard.write([new ClipboardItem({
+          "image/png": blob
+        })]).then(function () {
+          setCopied(true);
+          setTimeout(function () {
+            setCopied(false);
+          }, 2000);
+        });
+      }
+    });
+  }
+  function downloadImage() {
+    var c = canvasRef.current;
+    if (!c) return;
+    var a = document.createElement("a");
+    a.download = "flux-stats.png";
+    a.href = c.toDataURL("image/png");
+    a.click();
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 250,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.7)",
+      backdropFilter: "blur(4px)"
+    },
+    onClick: function (e) {
+      if (e.target === e.currentTarget) onClose();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      borderRadius: 16,
+      padding: 20,
+      animation: "fadeUp 0.25s",
+      textAlign: "center",
+      maxWidth: "90vw"
+    }
+  }, /*#__PURE__*/React.createElement("canvas", {
+    ref: canvasRef,
+    style: {
+      width: "100%",
+      maxWidth: 400,
+      borderRadius: 10,
+      marginBottom: 10
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: copyImage,
+    style: {
+      padding: "8px 18px",
+      borderRadius: 8,
+      fontSize: 12,
+      fontWeight: 700,
+      background: "var(--surface2)",
+      color: copied ? "var(--green)" : "var(--dim)",
+      border: "1px solid var(--border)"
+    }
+  }, copied ? "Copied!" : "📋 Copy"), /*#__PURE__*/React.createElement("button", {
+    onClick: downloadImage,
+    style: {
+      padding: "8px 18px",
+      borderRadius: 8,
+      fontSize: 12,
+      fontWeight: 700,
+      background: "var(--surface2)",
+      color: "var(--dim)",
+      border: "1px solid var(--border)"
+    }
+  }, "\uD83D\uDCBE Save"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      padding: "8px 18px",
+      borderRadius: 8,
+      fontSize: 12,
+      fontWeight: 700,
+      background: "var(--surface2)",
+      color: "var(--dim)",
+      border: "1px solid var(--border)"
+    }
+  }, "Close"))));
+}
+
+/* ═══ UPDATE BANNER ══════════════════════════════════════════════ */
+function UpdateBanner({
+  currentVersion
+}) {
+  var [newVersion, setNewVersion] = useState(null);
+  var [dismissed, setDismissed] = useState(false);
+  useEffect(function () {
+    var url = window.location.href.replace(/index\.html.*$/, "").replace(/\/$/, "") + "/version.txt";
+    fetch(url + "?t=" + Date.now()).then(function (r) {
+      return r.text();
+    }).then(function (t) {
+      var v = t.trim();
+      if (v && v !== currentVersion && v.startsWith("v")) setNewVersion(v);
+    }).catch(function () {});
+  }, []);
+  if (!newVersion || dismissed) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 500,
+      padding: "10px 16px",
+      background: "linear-gradient(135deg,rgba(139,92,246,0.95),rgba(99,102,241,0.95))",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      animation: "fadeUp 0.3s"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#fff"
+    }
+  }, "🎉 Flux " + newVersion + " is available!"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      window.location.reload(true);
+    },
+    style: {
+      padding: "5px 14px",
+      borderRadius: 7,
+      fontSize: 12,
+      fontWeight: 700,
+      background: "#fff",
+      color: "#4f46e5",
+      border: "none"
+    }
+  }, "Update"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setDismissed(true);
+    },
+    style: {
+      padding: "5px 10px",
+      borderRadius: 7,
+      fontSize: 12,
+      fontWeight: 700,
+      background: "rgba(255,255,255,0.2)",
+      color: "#fff",
+      border: "none"
+    }
+  }, "Later")));
+}
 const TAG_COLORS = {
   CARDS: "#c084fc",
   LUCK: "#ff5e78",
@@ -8373,7 +10043,8 @@ const TAG_COLORS = {
   MEMORY: "#3498db",
   WORDS: "#56c1ff",
   CRASH: "#fbbf24",
-  TABLE: "#f39c12"
+  TABLE: "#f39c12",
+  PACKS: "#a855f7"
 };
 const GAME_CREDITS = [{
   name: "Blackjack",
@@ -8582,6 +10253,30 @@ const GAME_CREDITS = [{
   }, {
     t: "Rainbet",
     u: "https://rainbet.com"
+  }]
+}, {
+  name: "Chicken",
+  src: "Tile-reveal risk game",
+  links: [{
+    t: "Stake Chicken",
+    u: "https://stake.com/casino/games/chicken"
+  }, {
+    t: "Mystake Chicken",
+    u: "https://mystake.com"
+  }]
+}, {
+  name: "Packs",
+  src: "CS:GO-style lootbox opening",
+  links: [{
+    t: "CS:GO Cases",
+    u: "https://csgocases.com"
+  }]
+}, {
+  name: "Scarab Spin",
+  src: "5-reel Egyptian-themed slot",
+  links: [{
+    t: "Stake Slots",
+    u: "https://stake.com/casino/slots"
   }]
 }];
 function DebtPopup({
@@ -9010,6 +10705,33 @@ const GAMES = [{
   tag: "TABLE",
   safe: false,
   safeOnly: false
+}, {
+  id: "chicken",
+  name: "Chicken",
+  icon: "🐔",
+  desc: "Reveal tiles, avoid bones",
+  color: "#fbbf24",
+  tag: "RISK",
+  safe: false,
+  safeOnly: false
+}, {
+  id: "packs",
+  name: "Packs",
+  icon: "📦",
+  desc: "Open lootboxes, collect items",
+  color: "#a855f7",
+  tag: "PACKS",
+  safe: false,
+  safeOnly: false
+}, {
+  id: "scarab",
+  name: "Scarab Spin",
+  icon: "🪲",
+  desc: "5-reel slots with wilds",
+  color: "#fbbf24",
+  tag: "LUCK",
+  safe: false,
+  safeOnly: false
 }];
 function GameCard({
   game,
@@ -9247,6 +10969,314 @@ function DevMenu({
     }
   }, "Triple-tap Flux logo to toggle"))));
 }
+
+/* ═══════════ LEVEL UP OVERLAY ═══════════════════════════════════ */
+function LevelUpOverlay({
+  level,
+  title,
+  titleColor,
+  onDone
+}) {
+  var [phase, setPhase] = useState("burst");
+  useEffect(function () {
+    var t1 = setTimeout(function () {
+      setPhase("show");
+    }, 400);
+    var t2 = setTimeout(function () {
+      setPhase("fade");
+    }, 3200);
+    var t3 = setTimeout(function () {
+      onDone();
+    }, 3800);
+    return function () {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, []);
+  try {
+    playSound("jackpot");
+  } catch (e) {}
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 600,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.85)",
+      backdropFilter: "blur(8px)",
+      opacity: phase === "fade" ? 0 : 1,
+      transition: "opacity 0.6s ease-out",
+      pointerEvents: "none"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      width: 200,
+      height: 200,
+      marginLeft: -100,
+      marginTop: -100,
+      borderRadius: "50%",
+      border: "3px solid " + (titleColor || "#ffd700"),
+      animation: "levelRing 1.5s ease-out forwards",
+      opacity: 0
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      width: 300,
+      height: 300,
+      marginLeft: -150,
+      marginTop: -150,
+      borderRadius: "50%",
+      border: "2px solid " + (titleColor || "#ffd700") + "44",
+      animation: "levelRing 2s ease-out 0.3s forwards",
+      opacity: 0
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      animation: "levelBurst 0.8s cubic-bezier(0.34,1.56,0.64,1)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: titleColor || "#ffd700",
+      letterSpacing: 3,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      opacity: phase === "show" || phase === "fade" ? 1 : 0,
+      transition: "opacity 0.4s",
+      fontFamily: "'Outfit',sans-serif"
+    }
+  }, "LEVEL UP!"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 72,
+      fontWeight: 900,
+      color: titleColor || "#ffd700",
+      fontFamily: "'JetBrains Mono',monospace",
+      animation: "levelGlow 2s ease-in-out infinite",
+      lineHeight: 1
+    }
+  }, level), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontWeight: 800,
+      color: titleColor || "#ffd700",
+      fontFamily: "'Playfair Display',serif",
+      fontStyle: "italic",
+      marginTop: 12,
+      opacity: phase === "show" || phase === "fade" ? 1 : 0,
+      transform: phase === "show" || phase === "fade" ? "translateY(0)" : "translateY(20px)",
+      transition: "all 0.5s ease-out 0.3s"
+    }
+  }, title))));
+}
+
+/* ═══════════ DAILY STREAK POPUP ════════════════════════════════ */
+function DailyStreakPopup({
+  streak,
+  bonus,
+  onClaim
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 300,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.7)",
+      backdropFilter: "blur(4px)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      borderRadius: 18,
+      padding: 24,
+      width: "88%",
+      maxWidth: 340,
+      textAlign: "center",
+      animation: "fadeUp 0.35s",
+      backdropFilter: "blur(16px)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 48,
+      marginBottom: 8
+    }
+  }, "\uD83D\uDD25"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Playfair Display',serif",
+      fontSize: 22,
+      fontWeight: 900,
+      fontStyle: "italic",
+      color: "var(--text)",
+      marginBottom: 4
+    }
+  }, "Daily Streak!"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 42,
+      fontWeight: 900,
+      color: "var(--accent)",
+      fontFamily: "'JetBrains Mono',monospace",
+      marginBottom: 4
+    }
+  }, streak), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "var(--dim)",
+      marginBottom: 16
+    }
+  }, streak === 1 ? "Welcome back! Start your streak." : "Day " + streak + " in a row!"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "rgba(74,222,128,0.1)",
+      borderRadius: 12,
+      border: "1px solid rgba(74,222,128,0.2)",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      fontWeight: 600,
+      marginBottom: 4
+    }
+  }, "DAILY BONUS"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 28,
+      fontWeight: 900,
+      color: "var(--green)",
+      fontFamily: "'JetBrains Mono',monospace"
+    }
+  }, "+", bonus, " chips")), streak < 7 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      marginBottom: 12
+    }
+  }, "Tomorrow: +" + getDailyBonus(streak + 1) + " chips"), streak >= 7 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--accent)",
+      marginBottom: 12
+    }
+  }, "Max bonus reached! 🎉"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClaim,
+    style: {
+      padding: "12px 32px",
+      borderRadius: 10,
+      fontSize: 15,
+      fontWeight: 700,
+      background: "linear-gradient(135deg,var(--green),#22c55e)",
+      color: "#fff",
+      border: "2px solid var(--green)",
+      width: "100%"
+    }
+  }, "Collect Bonus")));
+}
+
+/* ═══════════ AFK DETECTION POPUP ═══════════════════════════════ */
+function AFKPopup({
+  onYes,
+  onTimeout
+}) {
+  var [countdown, setCountdown] = useState(120);
+  useEffect(function () {
+    var iv = setInterval(function () {
+      setCountdown(function (c) {
+        if (c <= 1) {
+          clearInterval(iv);
+          onTimeout();
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return function () {
+      clearInterval(iv);
+    };
+  }, []);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 400,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.7)",
+      backdropFilter: "blur(4px)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      borderRadius: 18,
+      padding: 24,
+      width: "88%",
+      maxWidth: 320,
+      textAlign: "center",
+      animation: "fadeUp 0.3s",
+      backdropFilter: "blur(16px)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 2,
+      color: "var(--dim)",
+      marginBottom: 16,
+      textTransform: "uppercase"
+    }
+  }, "AFK Detection:"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 48,
+      marginBottom: 12
+    }
+  }, "\uD83D\uDCA4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Playfair Display',serif",
+      fontSize: 20,
+      fontWeight: 900,
+      fontStyle: "italic",
+      color: "var(--text)",
+      marginBottom: 8
+    }
+  }, "Are you still playing?"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--dim)",
+      marginBottom: 20
+    }
+  }, "Session timer paused. Resuming in ", countdown, "s or tap below."), /*#__PURE__*/React.createElement("button", {
+    onClick: onYes,
+    style: {
+      padding: "12px 32px",
+      borderRadius: 10,
+      fontSize: 15,
+      fontWeight: 700,
+      background: "linear-gradient(135deg,#c084fc,#818cf8)",
+      color: "#fff",
+      border: "2px solid #8b5cf6",
+      width: "100%"
+    }
+  }, "Yes, I'm here!")));
+}
 function FluxApp() {
   var save = loadSave();
   const [chips, setChips] = useState(save.chips);
@@ -9279,6 +11309,29 @@ function FluxApp() {
   const [username, setUsername] = useState(save.username || "");
   const [editUsername, setEditUsername] = useState(save.username || "");
   const [quickPlay, setQuickPlay] = useState(save.quickPlay || false);
+  const [theme, setTheme] = useState(save.theme || "default");
+  const [soundOn, setSoundOn] = useState(save.soundOn !== false);
+  const [avatar, setAvatar] = useState(save.avatar || "👤");
+  const [balanceHistory, setBalanceHistory] = useState(save.balanceHistory || []);
+  const [collection, setCollection] = useState(save.collection || []);
+  const [showShareCard, setShowShareCard] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [xp, setXp] = useState(save.xp || 0);
+  const [dailyStreak, setDailyStreak] = useState(save.dailyStreak || 0);
+  const [bestDailyStreak, setBestDailyStreak] = useState(save.bestDailyStreak || 0);
+  const [lastPlayDate, setLastPlayDate] = useState(save.lastPlayDate || null);
+  const [longestSession, setLongestSession] = useState(save.longestSession || 0);
+  const [showDailyStreak, setShowDailyStreak] = useState(false);
+  const [dailyBonusAmount, setDailyBonusAmount] = useState(0);
+  const [levelUpData, setLevelUpData] = useState(null);
+  const [sessionSeconds, setSessionSeconds] = useState(0);
+  const [sessionActive, setSessionActive] = useState(true);
+  const [showAFK, setShowAFK] = useState(false);
+  const [afkDismissCount, setAfkDismissCount] = useState(0);
+  const lastActivityRef = useRef(Date.now());
+  const sessionTimerRef = useRef(null);
+  const afkDismissRef = useRef(0);
   const logoTapRef = useRef({
     count: 0,
     timer: null
@@ -9320,34 +11373,77 @@ function FluxApp() {
       toastPos: toastPos,
       username: username,
       quickPlay: quickPlay,
+      theme: theme,
+      soundOn: soundOn,
+      avatar: avatar,
       achievements: achievements,
       betHistory: betHistory.slice(-50),
-      stats: stats
+      balanceHistory: balanceHistory.slice(-100),
+      collection: collection,
+      stats: stats,
+      xp: xp,
+      lastPlayDate: lastPlayDate,
+      dailyStreak: dailyStreak,
+      bestDailyStreak: bestDailyStreak,
+      longestSession: longestSession
     };
     writeSave(saveData);
-  }, [chips, safeMode, toastPos, username, quickPlay, achievements, betHistory, stats]);
+  }, [chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession]);
 
   // Track game results for achievements/stats/history
   function trackResult(event) {
     try {
       if (navigator.vibrate) navigator.vibrate(event.type === "win" ? [50, 30, 50] : [80]);
     } catch (e) {}
+    lastActivityRef.current = Date.now();
     var newStats = Object.assign({}, stats);
     newStats.gamesPlayed = (newStats.gamesPlayed || 0) + 1;
     if (event.bet) newStats.totalWagered = (newStats.totalWagered || 0) + event.bet;
+    /* per-game lose streak tracking for XP */
+    if (!newStats.perGame) newStats.perGame = {};
+    if (!newStats.perGame[event.game]) newStats.perGame[event.game] = {
+      played: 0,
+      won: 0,
+      lost: 0,
+      currentLoseStreak: 0
+    };
+    var pg = newStats.perGame[event.game];
+    pg.played = (pg.played || 0) + 1;
     if (event.type === "win") {
       newStats.totalWon = (newStats.totalWon || 0) + 1;
       newStats.currentWinStreak = (newStats.currentWinStreak || 0) + 1;
       newStats.currentLoseStreak = 0;
       if (newStats.currentWinStreak > (newStats.longestWinStreak || 0)) newStats.longestWinStreak = newStats.currentWinStreak;
       if (event.profit > (newStats.biggestWin || 0)) newStats.biggestWin = event.profit;
+      pg.won = (pg.won || 0) + 1;
+      pg.currentLoseStreak = 0;
     } else if (event.type === "lose") {
       newStats.totalLost = (newStats.totalLost || 0) + 1;
       newStats.currentLoseStreak = (newStats.currentLoseStreak || 0) + 1;
       newStats.currentWinStreak = 0;
       if (newStats.currentLoseStreak > (newStats.longestLoseStreak || 0)) newStats.longestLoseStreak = newStats.currentLoseStreak;
+      pg.lost = (pg.lost || 0) + 1;
+      pg.currentLoseStreak = (pg.currentLoseStreak || 0) + 1;
     }
     setStats(newStats);
+    /* XP calculation */
+    var xpChange = calcXpChange(event, {
+      perGame: newStats.perGame
+    });
+    var oldXp = xp;
+    var newXp = Math.max(0, oldXp + xpChange);
+    var oldLevel = getLevelInfo(oldXp);
+    var newLevel = getLevelInfo(newXp);
+    setXp(newXp);
+    if (newLevel.level > oldLevel.level) {
+      setTimeout(function () {
+        setLevelUpData({
+          level: newLevel.level,
+          title: newLevel.title,
+          titleColor: newLevel.titleColor
+        });
+      }, 1500);
+    }
     if (event.bet) {
       var entry = {
         game: event.game || "?",
@@ -9432,9 +11528,23 @@ function FluxApp() {
     setUsername("");
     setEditUsername("");
     setQuickPlay(false);
+    setTheme("default");
+    setSoundOn(true);
+    setAvatar("👤");
+    setBalanceHistory([]);
+    setCollection([]);
+    applyTheme("default");
     setAchievements([]);
     setBetHistory([]);
     setStats(DEFAULT_SAVE.stats);
+    setXp(0);
+    setDailyStreak(0);
+    setBestDailyStreak(0);
+    setLastPlayDate(null);
+    setLongestSession(0);
+    setSessionSeconds(0);
+    afkDismissRef.current = 0;
+    setAfkDismissCount(0);
     setShowResetConfirm(false);
     setShowSettings(false);
   }
@@ -9443,9 +11553,24 @@ function FluxApp() {
     setShowSettings(false);
     setShowToastPicker(false);
     setShowResetConfirm(false);
+    setShowThemePicker(false);
+    setShowAvatarPicker(false);
   }
 
   // Check safe mode achievement
+  useEffect(function () {
+    applyTheme(theme);
+  }, [theme]);
+  useEffect(function () {
+    window.__fluxSoundOff = !soundOn;
+  }, [soundOn]);
+  useEffect(function () {
+    setBalanceHistory(function (h) {
+      var last = h.length > 0 ? h[h.length - 1] : null;
+      if (last !== chips) return h.concat([chips]).slice(-100);
+      return h;
+    });
+  }, [chips]);
   useEffect(function () {
     if (safeMode && achievements.indexOf("safe_mode") === -1) {
       var newAch = ["safe_mode"];
@@ -9459,6 +11584,105 @@ function FluxApp() {
       }, 1500);
     }
   }, [safeMode]);
+
+  /* ═══ DAILY STREAK CHECK ═══ */
+  useEffect(function () {
+    if (splash !== "done") return;
+    var today = getTodayDateStr();
+    if (lastPlayDate === today) return;
+    var yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    var yesterdayStr = yesterday.getFullYear() + "-" + String(yesterday.getMonth() + 1).padStart(2, "0") + "-" + String(yesterday.getDate()).padStart(2, "0");
+    var newStreak;
+    if (lastPlayDate === yesterdayStr) {
+      newStreak = dailyStreak + 1;
+    } else {
+      newStreak = 1;
+    }
+    var bonus = getDailyBonus(newStreak);
+    setDailyStreak(newStreak);
+    setLastPlayDate(today);
+    if (newStreak > bestDailyStreak) setBestDailyStreak(newStreak);
+    setDailyBonusAmount(bonus);
+    setTimeout(function () {
+      setShowDailyStreak(true);
+    }, 1500);
+  }, [splash]);
+
+  /* ═══ SESSION TIMER ═══ */
+  useEffect(function () {
+    lastActivityRef.current = Date.now();
+    sessionTimerRef.current = setInterval(function () {
+      if (!sessionActive) return;
+      var now = Date.now();
+      var idleMs = now - lastActivityRef.current;
+      var idleSec = idleMs / 1000;
+      var dismisses = afkDismissRef.current;
+      /* AFK thresholds: first=60s, after 1 dismiss=300s, after 2 dismisses=never */
+      var threshold = dismisses === 0 ? 60 : dismisses === 1 ? 300 : Infinity;
+      if (idleSec >= threshold && threshold < Infinity) {
+        setShowAFK(true);
+        setSessionActive(false);
+        return;
+      }
+      setSessionSeconds(function (s) {
+        var ns = s + 1;
+        setLongestSession(function (ls) {
+          return Math.max(ls, ns);
+        });
+        return ns;
+      });
+    }, 1000);
+    return function () {
+      if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
+    };
+  }, [sessionActive]);
+
+  /* ═══ ACTIVITY LISTENER ═══ */
+  useEffect(function () {
+    function onActivity() {
+      lastActivityRef.current = Date.now();
+      if (!sessionActive && !showAFK) {
+        setSessionActive(true);
+      }
+    }
+    window.addEventListener("touchstart", onActivity, {
+      passive: true
+    });
+    window.addEventListener("mousedown", onActivity, {
+      passive: true
+    });
+    window.addEventListener("keydown", onActivity, {
+      passive: true
+    });
+    window.addEventListener("click", onActivity, {
+      passive: true
+    });
+    return function () {
+      window.removeEventListener("touchstart", onActivity);
+      window.removeEventListener("mousedown", onActivity);
+      window.removeEventListener("keydown", onActivity);
+      window.removeEventListener("click", onActivity);
+    };
+  }, [sessionActive, showAFK]);
+  function handleAFKYes() {
+    setShowAFK(false);
+    setSessionActive(true);
+    lastActivityRef.current = Date.now();
+    afkDismissRef.current = afkDismissRef.current + 1;
+    setAfkDismissCount(afkDismissRef.current);
+  }
+  function handleAFKTimeout() {
+    setShowAFK(false);
+    setSessionActive(false);
+    /* Timer stays stopped until user interacts */
+  }
+  function handleDailyStreakClaim() {
+    setChips(function (c) {
+      return c + dailyBonusAmount;
+    });
+    setShowDailyStreak(false);
+  }
   useEffect(function () {
     var minShown = false;
     var loaded = false;
@@ -9532,6 +11756,12 @@ function FluxApp() {
   if (game === "coinflip") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(CoinFlip, gp));
   if (game === "videopoker") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(VideoPoker, gp));
   if (game === "baccarat") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Baccarat, gp));
+  if (game === "chicken") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Chicken, gp));
+  if (game === "packs") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Packs, _extends({}, gp, {
+    collection: collection,
+    setCollection: setCollection
+  })));
+  if (game === "scarab") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Scarab, gp));
   return /*#__PURE__*/React.createElement(Wrap, null, splash !== "done" && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -9634,7 +11864,7 @@ function FluxApp() {
       letterSpacing: 0.4,
       fontWeight: 500
     }
-  }, safeMode ? "23 Games · Pure Skill" : "23 Games · Always Shifting"), !safeMode && /*#__PURE__*/React.createElement("div", {
+  }, safeMode ? "26 Games · Pure Skill" : "26 Games · Always Shifting"), !safeMode && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -9735,7 +11965,7 @@ function FluxApp() {
       fontWeight: 700,
       opacity: 0.7
     }
-  }, "👤 " + username), showProfile && /*#__PURE__*/React.createElement("div", {
+  }, avatar + " " + username + " · Lv." + getLevelInfo(xp).level), showProfile && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
@@ -9765,7 +11995,7 @@ function FluxApp() {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 12
+      marginBottom: 6
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -9775,7 +12005,7 @@ function FluxApp() {
       fontStyle: "italic",
       color: "var(--text)"
     }
-  }, "👤 " + (username || "Player")), /*#__PURE__*/React.createElement("button", {
+  }, avatar + " " + (username || "Player")), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowProfile(false);
     },
@@ -9792,6 +12022,49 @@ function FluxApp() {
       justifyContent: "center"
     }
   }, "✕")), function () {
+    var li = getLevelInfo(xp);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: li.titleColor,
+        fontFamily: "'JetBrains Mono',monospace"
+      }
+    }, "Lv." + li.level + " " + li.title), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "var(--dim)",
+        fontFamily: "'JetBrains Mono',monospace"
+      }
+    }, li.level < 50 ? li.xpInLevel + "/" + li.xpForNext + " XP" : "MAX")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: "100%",
+        height: 6,
+        background: "var(--surface2)",
+        borderRadius: 3,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: li.progress * 100 + "%",
+        height: "100%",
+        background: "linear-gradient(90deg," + li.titleColor + "," + li.titleColor + "88)",
+        borderRadius: 3,
+        transition: "width 0.5s ease-out"
+      }
+    })));
+  }(), function () {
     var s = stats;
     var wins = (s.gamesPlayed || 0) - (s.totalLost ? Math.round(s.gamesPlayed * s.totalLost / (s.totalWon + s.totalLost)) : 0);
     var winRate = s.gamesPlayed > 0 ? Math.round((s.longestWinStreak > 0 ? s.totalWon / (s.totalWon + s.totalLost) : 0) * 100) : 0;
@@ -9851,7 +12124,7 @@ function FluxApp() {
       border: "1px solid var(--border)",
       textAlign: "center"
     }
-  }, "\uD83D\uDCCA Full Stats"), /*#__PURE__*/React.createElement("button", {
+  }, "\uD83D\uDCCA Stats"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowProfile(false);
       setShowAchievements(true);
@@ -9867,7 +12140,23 @@ function FluxApp() {
       border: "1px solid var(--border)",
       textAlign: "center"
     }
-  }, "\uD83C\uDFC6 Achievements")))), showSettings && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83C\uDFC6 Achieve"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowProfile(false);
+      setShowShareCard(true);
+    },
+    style: {
+      flex: 1,
+      padding: "8px",
+      borderRadius: 8,
+      fontSize: 11,
+      fontWeight: 700,
+      background: "var(--surface2)",
+      color: "var(--cool)",
+      border: "1px solid rgba(86,193,255,0.3)",
+      textAlign: "center"
+    }
+  }, "\uD83D\uDCE4 Share")))), showSettings && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
@@ -9894,7 +12183,7 @@ function FluxApp() {
       animation: "fadeUp 0.25s",
       backdropFilter: "blur(16px)"
     }
-  }, !showResetConfirm && !showToastPicker && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, !showResetConfirm && !showToastPicker && !showThemePicker && !showAvatarPicker && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -10152,6 +12441,171 @@ function FluxApp() {
     }
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "14px 16px",
+      background: "var(--surface2)",
+      borderRadius: 12,
+      border: "1px solid var(--border)",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "🔊"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: "var(--text)"
+    }
+  }, "Sound Effects")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      lineHeight: 1.4,
+      maxWidth: 200
+    }
+  }, "Plays audio on wins, losses, and actions.")), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setSoundOn(function (s) {
+        return !s;
+      });
+    },
+    style: {
+      width: 48,
+      height: 28,
+      borderRadius: 14,
+      background: soundOn ? "var(--green)" : "var(--surface)",
+      border: soundOn ? "2px solid var(--green)" : "2px solid var(--border)",
+      position: "relative",
+      transition: "all 0.3s",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 20,
+      height: 20,
+      borderRadius: "50%",
+      background: "#fff",
+      position: "absolute",
+      top: 2,
+      left: soundOn ? 24 : 2,
+      transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px 16px",
+      background: "var(--surface2)",
+      borderRadius: 12,
+      border: "1px solid var(--border)",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "🎨"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: "var(--text)"
+    }
+  }, "Theme")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      lineHeight: 1.4
+    }
+  }, THEMES[theme] ? THEMES[theme].name : "Cosmic")), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowThemePicker(true);
+    },
+    style: {
+      padding: "6px 14px",
+      borderRadius: 8,
+      fontSize: 11,
+      fontWeight: 700,
+      background: "var(--surface)",
+      color: "var(--cool)",
+      border: "1px solid rgba(86,193,255,0.3)",
+      whiteSpace: "nowrap"
+    }
+  }, "Change"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "14px 16px",
+      background: "var(--surface2)",
+      borderRadius: 12,
+      border: "1px solid var(--border)",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, avatar), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: "var(--text)"
+    }
+  }, "Avatar")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)",
+      lineHeight: 1.4
+    }
+  }, "Your profile icon.")), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowAvatarPicker(true);
+    },
+    style: {
+      padding: "6px 14px",
+      borderRadius: 8,
+      fontSize: 11,
+      fontWeight: 700,
+      background: "var(--surface)",
+      color: "var(--cool)",
+      border: "1px solid rgba(86,193,255,0.3)",
+      whiteSpace: "nowrap"
+    }
+  }, "Change"))), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
       gap: 8,
@@ -10377,6 +12831,151 @@ function FluxApp() {
       color: "#fff",
       border: "2px solid #8b5cf6"
     }
+  }, "Done")), showThemePicker && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 36,
+      marginBottom: 12
+    }
+  }, "🎨"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Playfair Display',serif",
+      fontSize: 18,
+      fontWeight: 900,
+      fontStyle: "italic",
+      color: "var(--text)",
+      marginBottom: 8
+    }
+  }, "Theme"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "var(--dim)",
+      lineHeight: 1.5,
+      marginBottom: 16
+    }
+  }, "Choose your vibe."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8,
+      maxWidth: 280,
+      margin: "0 auto 16px"
+    }
+  }, Object.keys(THEMES).map(function (tid) {
+    var t = THEMES[tid];
+    var selected = theme === tid;
+    return /*#__PURE__*/React.createElement("button", {
+      key: tid,
+      onClick: function () {
+        setTheme(tid);
+        applyTheme(tid);
+      },
+      style: {
+        padding: "12px 8px",
+        borderRadius: 10,
+        fontSize: 13,
+        fontWeight: 700,
+        background: selected ? t.neon + "20" : "var(--surface2)",
+        color: selected ? t.neon : "var(--dim)",
+        border: selected ? "2px solid " + t.neon : "1px solid var(--border)",
+        transition: "all 0.2s",
+        textAlign: "left"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 4,
+        marginBottom: 4
+      }
+    }, [t.neon, t.accent, t.green, t.cool].map(function (c, i) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: i,
+        style: {
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: c
+        }
+      });
+    })), t.name);
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowThemePicker(false);
+    },
+    style: {
+      padding: "10px 32px",
+      borderRadius: 10,
+      fontSize: 14,
+      fontWeight: 700,
+      background: "linear-gradient(135deg,#c084fc,#818cf8)",
+      color: "#fff",
+      border: "2px solid #8b5cf6"
+    }
+  }, "Done")), showAvatarPicker && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 48,
+      marginBottom: 8
+    }
+  }, avatar), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Playfair Display',serif",
+      fontSize: 18,
+      fontWeight: 900,
+      fontStyle: "italic",
+      color: "var(--text)",
+      marginBottom: 8
+    }
+  }, "Choose Avatar"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "var(--dim)",
+      lineHeight: 1.5,
+      marginBottom: 16
+    }
+  }, "Pick your icon."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(5, 1fr)",
+      gap: 6,
+      maxWidth: 260,
+      margin: "0 auto 16px"
+    }
+  }, AVATARS.map(function (a) {
+    var selected = avatar === a;
+    return /*#__PURE__*/React.createElement("button", {
+      key: a,
+      onClick: function () {
+        setAvatar(a);
+      },
+      style: {
+        fontSize: 26,
+        padding: 8,
+        borderRadius: 10,
+        background: selected ? "var(--neon)" + "20" : "var(--surface2)",
+        border: selected ? "2px solid var(--neon)" : "1px solid var(--border)",
+        transition: "all 0.2s"
+      }
+    }, a);
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowAvatarPicker(false);
+    },
+    style: {
+      padding: "10px 32px",
+      borderRadius: 10,
+      fontSize: 14,
+      fontWeight: 700,
+      background: "linear-gradient(135deg,#c084fc,#818cf8)",
+      color: "#fff",
+      border: "2px solid #8b5cf6"
+    }
   }, "Done")))), showInfo && /*#__PURE__*/React.createElement(InfoPanel, {
     onClose: function () {
       setShowInfo(false);
@@ -10392,6 +12991,12 @@ function FluxApp() {
     achievements: achievements,
     chips: chips,
     username: username,
+    balanceHistory: balanceHistory,
+    xp: xp,
+    dailyStreak: dailyStreak,
+    bestDailyStreak: bestDailyStreak,
+    sessionSeconds: sessionSeconds,
+    longestSession: longestSession,
     onClose: function () {
       setShowStats(false);
     }
@@ -10419,6 +13024,31 @@ function FluxApp() {
     toasts: visibleToasts,
     onDismiss: dismissToast,
     pos: toastPos
+  }), showShareCard && /*#__PURE__*/React.createElement(ShareCard, {
+    username: username,
+    avatar: avatar,
+    chips: chips,
+    stats: stats,
+    achievements: achievements,
+    onClose: function () {
+      setShowShareCard(false);
+    }
+  }), showDailyStreak && /*#__PURE__*/React.createElement(DailyStreakPopup, {
+    streak: dailyStreak,
+    bonus: dailyBonusAmount,
+    onClaim: handleDailyStreakClaim
+  }), showAFK && /*#__PURE__*/React.createElement(AFKPopup, {
+    onYes: handleAFKYes,
+    onTimeout: handleAFKTimeout
+  }), levelUpData && /*#__PURE__*/React.createElement(LevelUpOverlay, {
+    level: levelUpData.level,
+    title: levelUpData.title,
+    titleColor: levelUpData.titleColor,
+    onDone: function () {
+      setLevelUpData(null);
+    }
+  }), /*#__PURE__*/React.createElement(UpdateBanner, {
+    currentVersion: VERSION
   }));
 }
 function Wrap({
@@ -10454,16 +13084,8 @@ function Wrap({
     }
   }, children));
 }
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(FluxApp));
-}
-</script>
-<script>
-if('serviceWorker' in navigator){
-  setTimeout(function(){
-    navigator.serviceWorker.register('sw.js').catch(function(){});
-  }, 3000);
-}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
 </script>
 </body>
 </html>
