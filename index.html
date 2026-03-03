@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#050508">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Flux</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation}body{min-height:100vh;min-height:100dvh}</style>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -9965,13 +9967,26 @@ function UpdateBanner({
 }) {
   var [newVersion, setNewVersion] = useState(null);
   var [dismissed, setDismissed] = useState(false);
+  function parseVer(v) {
+    var m = (v || "").match(/^v?(\d+)\.(\d+)\.(\d+)/);
+    if (!m) return null;
+    return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
+  }
+  function isNewer(remote, local) {
+    var r = parseVer(remote),
+      l = parseVer(local);
+    if (!r || !l) return false;
+    if (r[0] !== l[0]) return r[0] > l[0];
+    if (r[1] !== l[1]) return r[1] > l[1];
+    return r[2] > l[2];
+  }
   useEffect(function () {
     var url = window.location.href.replace(/index\.html.*$/, "").replace(/\/$/, "") + "/version.txt";
     fetch(url + "?t=" + Date.now()).then(function (r) {
       return r.text();
     }).then(function (t) {
       var v = t.trim();
-      if (v && v !== currentVersion && v.startsWith("v")) setNewVersion(v);
+      if (v && v.startsWith("v") && isNewer(v, currentVersion)) setNewVersion(v);
     }).catch(function () {});
   }, []);
   if (!newVersion || dismissed) return null;
@@ -13086,6 +13101,9 @@ function Wrap({
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(function(e) { console.log('SW registration failed:', e); });
+}
 </script>
 </body>
 </html>
