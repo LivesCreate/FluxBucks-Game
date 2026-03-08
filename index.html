@@ -24,7 +24,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.5.2";
+const VERSION = "v4.5.4";
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -10582,6 +10582,165 @@ function ShareCard({
   }, "Close"))));
 }
 
+/* ═══ DEVELOPER NEWS ═════════════════════════════════════════════ */
+function DevNews() {
+  var [messages, setMessages] = useState([]);
+  var [currentIdx, setCurrentIdx] = useState(0);
+  useEffect(function () {
+    try {
+      var url = window.location.href.replace(/index\.html.*$/, "").replace(/\/$/, "") + "/news.json";
+      fetch(url + "?t=" + Date.now()).then(function (r) {
+        if (!r.ok) return;
+        return r.json();
+      }).then(function (data) {
+        if (!data) return;
+        /* Support both single object and array */
+        var arr = Array.isArray(data) ? data : [data];
+        var seenRaw = null;
+        try {
+          seenRaw = localStorage.getItem("flux_news_seen");
+        } catch (e) {}
+        var seenIds = [];
+        try {
+          seenIds = seenRaw ? JSON.parse(seenRaw) : [];
+        } catch (e) {
+          seenIds = seenRaw ? [seenRaw] : [];
+        }
+        var unseen = arr.filter(function (m) {
+          return m && m.id && m.message && seenIds.indexOf(String(m.id)) === -1;
+        });
+        if (unseen.length > 0) setMessages(unseen);
+      }).catch(function () {});
+    } catch (e) {}
+  }, []);
+  function dismiss() {
+    var msg = messages[currentIdx];
+    if (msg) {
+      try {
+        var seenRaw = localStorage.getItem("flux_news_seen");
+        var seenIds = [];
+        try {
+          seenIds = seenRaw ? JSON.parse(seenRaw) : [];
+        } catch (e) {
+          seenIds = seenRaw ? [seenRaw] : [];
+        }
+        seenIds.push(String(msg.id));
+        localStorage.setItem("flux_news_seen", JSON.stringify(seenIds));
+      } catch (e) {}
+    }
+    if (currentIdx < messages.length - 1) {
+      setCurrentIdx(currentIdx + 1);
+    } else {
+      setMessages([]);
+    }
+  }
+  if (messages.length === 0) return null;
+  var news = messages[currentIdx];
+  var typeColors = {
+    "added": "var(--green)",
+    "declined": "var(--accent)",
+    "update": "var(--cool)",
+    "info": "var(--neon)"
+  };
+  var typeLabels = {
+    "added": "✅ ADDED",
+    "declined": "❌ NOT POSSIBLE",
+    "update": "🆕 UPDATE",
+    "info": "📢 NEWS"
+  };
+  var borderColor = typeColors[news.type] || "var(--border)";
+  var typeLabel = typeLabels[news.type] || null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 650,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.7)",
+      backdropFilter: "blur(4px)"
+    },
+    onClick: function (e) {
+      if (e.target === e.currentTarget) dismiss();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--surface)",
+      border: "2px solid " + borderColor,
+      borderRadius: 18,
+      padding: 24,
+      width: "88%",
+      maxWidth: 360,
+      animation: "fadeUp 0.25s",
+      textAlign: "center"
+    }
+  }, typeLabel && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 800,
+      color: borderColor,
+      letterSpacing: 1.5,
+      marginBottom: 8
+    }
+  }, typeLabel), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 36,
+      marginBottom: 10
+    }
+  }, news.icon || "📢"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Playfair Display',serif",
+      fontSize: 18,
+      fontWeight: 900,
+      fontStyle: "italic",
+      color: "var(--text)",
+      marginBottom: 10
+    }
+  }, news.title || "Developer Update"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "var(--dim)",
+      lineHeight: 1.7,
+      marginBottom: 18,
+      whiteSpace: "pre-line"
+    }
+  }, news.message), news.link && /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      window.open(news.link, "_blank");
+    },
+    style: {
+      padding: "10px 24px",
+      borderRadius: 10,
+      fontSize: 13,
+      fontWeight: 700,
+      background: "linear-gradient(135deg,#c084fc,#818cf8)",
+      color: "#fff",
+      border: "2px solid #8b5cf6",
+      marginBottom: 10,
+      width: "100%"
+    }
+  }, news.linkText || "Learn More"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: dismiss,
+    style: {
+      padding: "8px 24px",
+      borderRadius: 8,
+      fontSize: 12,
+      fontWeight: 600,
+      background: "var(--surface2)",
+      color: "var(--dim)",
+      border: "1px solid var(--border)"
+    }
+  }, currentIdx < messages.length - 1 ? "Next (" + (messages.length - currentIdx - 1) + " more)" : "Got it"))));
+}
+
 /* ═══ UPDATE BANNER ══════════════════════════════════════════════ */
 function UpdateBanner({
   currentVersion
@@ -14772,7 +14931,7 @@ function FluxApp() {
     }
   }), /*#__PURE__*/React.createElement(UpdateBanner, {
     currentVersion: VERSION
-  }));
+  }), /*#__PURE__*/React.createElement(DevNews, null));
 }
 var BG_STYLES = {
   "stars": {

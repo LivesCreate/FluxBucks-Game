@@ -1,0 +1,9 @@
+[
+  {
+    "id": 1,
+    "type": "update",
+    "icon": "🎉",
+    "title": "Welcome to FluxBucks v4.5!",
+    "message": "New in this update:\n\n⭐ Daily challenges with 32 unique goals\n📋 Changelog in Settings\n💬 Feedback form for suggestions\n📢 Developer news system (you're looking at it!)"
+  }
+]
