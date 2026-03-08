@@ -24,7 +24,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.5.4";
+const VERSION = "v4.6.0";
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -1265,6 +1265,11 @@ function AchievementToastStack({
   var baseStyle = {};
   if (isBottom) baseStyle.bottom = 76;else baseStyle.top = 24;
   if (isRight) baseStyle.right = 14;else baseStyle.left = 14;
+  function dismissAll() {
+    toasts.forEach(function (t) {
+      onDismiss(t.queueId);
+    });
+  }
   return /*#__PURE__*/React.createElement("div", {
     style: Object.assign({}, baseStyle, {
       position: "fixed",
@@ -1275,7 +1280,21 @@ function AchievementToastStack({
       pointerEvents: "none",
       maxWidth: "min(340px, 85vw)"
     })
-  }, toasts.map(function (toast, i) {
+  }, toasts.length > 1 && /*#__PURE__*/React.createElement("button", {
+    onClick: dismissAll,
+    style: {
+      pointerEvents: "auto",
+      padding: "4px 12px",
+      borderRadius: 6,
+      fontSize: 10,
+      fontWeight: 700,
+      background: "rgba(0,0,0,0.6)",
+      color: "var(--dim)",
+      border: "1px solid var(--border)",
+      alignSelf: isRight ? "flex-end" : "flex-start",
+      backdropFilter: "blur(8px)"
+    }
+  }, "Skip All"), toasts.map(function (toast, i) {
     return /*#__PURE__*/React.createElement(AchievementToastItem, {
       key: toast.queueId,
       achievement: toast.id,
@@ -1306,10 +1325,10 @@ function AchievementToastItem({
     }
     var t1 = setTimeout(function () {
       setPhase("exit");
-    }, 4500);
+    }, 2500);
     var t2 = setTimeout(function () {
       onDone();
-    }, 5100);
+    }, 3100);
     return function () {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -1328,6 +1347,7 @@ function AchievementToastItem({
     transition = "transform 0.4s ease-in, opacity 0.3s ease-in";
   }
   return /*#__PURE__*/React.createElement("div", {
+    onClick: onDone,
     style: {
       transform: transform,
       opacity: opacity,
@@ -1342,7 +1362,8 @@ function AchievementToastItem({
       boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 16px " + TIER_COLORS[def.tier] + "44",
       backdropFilter: "blur(12px)",
       maxWidth: 320,
-      pointerEvents: "none",
+      pointerEvents: "auto",
+      cursor: "pointer",
       animation: phase === "enter" ? "toastPop 0.5s cubic-bezier(0.34,1.56,0.64,1)" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -9577,11 +9598,18 @@ function Packs({
   var stripRef = useRef(null);
   var containerRef = useRef(null);
   var COST = 25;
-  var ITEM_W = 78;
-  var ITEM_GAP = 6;
+  var ITEM_W = 90;
+  var ITEM_GAP = 8;
   var ITEM_TOTAL = ITEM_W + ITEM_GAP;
   function openPack() {
-    if (phase !== "idle") return;
+    if (phase === "rolling") return;
+    if (phase === "reveal") {
+      setPhase("idle");
+      setFinalItem(null);
+      setResult(null);
+      setReelItems([]);
+      setReelOffset(0);
+    }
     function doIt() {
       doOpen();
     }
@@ -9601,7 +9629,7 @@ function Packs({
     setReelItems(reel.items);
     setWinPos(reel.winPos);
     var containerW = containerRef.current ? containerRef.current.offsetWidth : 300;
-    var targetX = reel.winPos * ITEM_TOTAL - containerW / 2 + ITEM_W / 2 + (Math.random() * 20 - 10);
+    var targetX = reel.winPos * ITEM_TOTAL - containerW / 2 + ITEM_W / 2;
     setReelOffset(0);
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
@@ -9613,29 +9641,32 @@ function Packs({
       setPhase("reveal");
       playSound(item.rarity === "legendary" || item.rarity === "epic" ? "jackpot" : "reveal");
       var isDupe = collection.indexOf(item.name) >= 0;
+      var profit;
       if (isDupe) {
         var bonus = RARITY_CHIPS[item.rarity] || 5;
         setChips(function (c) {
           return c + bonus;
         });
+        profit = bonus - COST;
         setResult({
-          type: "win",
+          type: profit >= 0 ? "win" : "lose",
           text: "Duplicate! +" + bonus + " chips"
         });
       } else {
         setCollection(function (c) {
           return c.concat([item.name]);
         });
+        profit = -COST;
         setResult({
           type: "win",
           text: "New: " + item.name + "!"
         });
       }
       if (trackResult) trackResult({
-        type: "win",
+        event: profit >= 0 ? "win" : "lose",
         game: "packs",
         bet: COST,
-        profit: isDupe ? RARITY_CHIPS[item.rarity] - COST : -COST,
+        profit: profit,
         rarity: item.rarity,
         collectionSize: collection.length + (isDupe ? 0 : 1)
       });
@@ -9656,7 +9687,7 @@ function Packs({
     ref: containerRef,
     style: {
       overflow: "hidden",
-      height: 100,
+      height: 110,
       position: "relative",
       borderRadius: 12,
       background: "var(--surface2)",
@@ -9708,10 +9739,9 @@ function Packs({
       gap: ITEM_GAP,
       position: "absolute",
       top: "50%",
-      left: 0,
+      left: "50%",
       transform: "translateY(-50%) translateX(" + reelOffset + "px)",
-      transition: phase === "rolling" ? "transform 5s cubic-bezier(0.15, 0.6, 0.25, 1)" : "none",
-      paddingLeft: 4
+      transition: phase === "rolling" ? "transform 5s cubic-bezier(0.15, 0.6, 0.25, 1)" : "none"
     }
   }, reelItems.map(function (item, i) {
     var isWinner = phase === "reveal" && i === winPos;
@@ -9719,7 +9749,7 @@ function Packs({
       key: i,
       style: {
         minWidth: ITEM_W,
-        height: 80,
+        height: 88,
         borderRadius: 10,
         background: isWinner ? RARITY_COLORS[item.rarity] + "30" : RARITY_COLORS[item.rarity] + "12",
         border: "2px solid " + (isWinner ? RARITY_COLORS[item.rarity] : RARITY_COLORS[item.rarity] + "60"),
@@ -9733,7 +9763,7 @@ function Packs({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 30
+        fontSize: 32
       }
     }, item.icon), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -9741,7 +9771,8 @@ function Packs({
         fontWeight: 700,
         color: RARITY_COLORS[item.rarity],
         textTransform: "uppercase",
-        letterSpacing: 1
+        letterSpacing: 1,
+        marginTop: 2
       }
     }, item.rarity));
   }))), phase === "reveal" && finalItem && /*#__PURE__*/React.createElement("div", {
@@ -9814,21 +9845,7 @@ function Packs({
     text: "📦 Open Pack (25 chips)",
     onClick: openPack,
     disabled: phase === "rolling" || chips < COST
-  }), phase === "reveal" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 8
-    }
-  }, /*#__PURE__*/React.createElement(GameBtn, {
-    color: "var(--neon2)",
-    text: "Open Another",
-    onClick: function () {
-      setPhase("idle");
-      setFinalItem(null);
-      setResult(null);
-      setReelItems([]);
-      setReelOffset(0);
-    }
-  }))), /*#__PURE__*/React.createElement(GameGuide, {
+  })), /*#__PURE__*/React.createElement(GameGuide, {
     items: PK_G,
     title: "Packs Guide"
   }));
@@ -11706,7 +11723,7 @@ const GAMES = [{
   desc: "Beat the dealer to 21",
   color: "var(--neon)",
   tag: "CARDS",
-  safe: false,
+  safe: true,
   safeOnly: false
 }, {
   id: "highlow",
@@ -11715,7 +11732,7 @@ const GAMES = [{
   desc: "Streak card guessing",
   color: "var(--cool)",
   tag: "CARDS",
-  safe: false,
+  safe: true,
   safeOnly: false
 }, {
   id: "slots",
@@ -11895,7 +11912,7 @@ const GAMES = [{
   desc: "Hold & draw for poker hands",
   color: "#c084fc",
   tag: "CARDS",
-  safe: false,
+  safe: true,
   safeOnly: false
 }, {
   id: "baccarat",
