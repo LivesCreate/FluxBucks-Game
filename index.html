@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FluxBucks">
 <meta name="theme-color" content="#050508">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -23,7 +24,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.3.0";
+const VERSION = "v4.4.0";
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -998,8 +999,8 @@ function AchievementToastStack({
   var isBottom = p === "bottom-right" || p === "bottom-left";
   var isRight = p === "bottom-right" || p === "top-right";
   var baseStyle = {};
-  if (isBottom) baseStyle.bottom = 24;else baseStyle.top = 24;
-  if (isRight) baseStyle.right = 24;else baseStyle.left = 24;
+  if (isBottom) baseStyle.bottom = 76;else baseStyle.top = 24;
+  if (isRight) baseStyle.right = 14;else baseStyle.left = 14;
   return /*#__PURE__*/React.createElement("div", {
     style: Object.assign({}, baseStyle, {
       position: "fixed",
@@ -1007,7 +1008,8 @@ function AchievementToastStack({
       display: "flex",
       flexDirection: isBottom ? "column-reverse" : "column",
       gap: 8,
-      pointerEvents: "none"
+      pointerEvents: "none",
+      maxWidth: "min(340px, 85vw)"
     })
   }, toasts.map(function (toast, i) {
     return /*#__PURE__*/React.createElement(AchievementToastItem, {
@@ -1333,14 +1335,35 @@ function StatsPage({
     }
   }, "✕")), username && /*#__PURE__*/React.createElement("div", {
     style: {
-      textAlign: "center",
-      marginBottom: 8,
-      fontSize: 14,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginBottom: 12,
+      padding: "10px 14px",
+      background: "var(--surface2)",
+      borderRadius: 10,
+      border: "1px solid var(--border)"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 800,
+      color: "var(--text)",
+      fontFamily: "'JetBrains Mono',monospace",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      maxWidth: 200
+    }
+  }, username), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
       fontWeight: 700,
-      color: "var(--neon)",
+      color: li.titleColor,
       fontFamily: "'JetBrains Mono',monospace"
     }
-  }, "👤 " + username), /*#__PURE__*/React.createElement("div", {
+  }, "Lv." + li.level)), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "12px 14px",
       background: "var(--surface2)",
@@ -1711,15 +1734,16 @@ function StatsPage({
         color: b.profit >= 0 ? "var(--green)" : "var(--accent)"
       }
     }, b.profit >= 0 ? "+" : "", b.profit));
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement(BalanceGraph, {
+    history: balanceHistory
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
-      justifyContent: "center"
+      justifyContent: "center",
+      marginTop: 14
     }
-  }, /*#__PURE__*/React.createElement(BalanceGraph, {
-    history: balanceHistory
-  }), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("button", {
     id: "copyStatsBtn",
     onClick: function () {
       if (navigator.clipboard) {
@@ -1745,18 +1769,7 @@ function StatsPage({
       color: "var(--dim)",
       border: "1px solid var(--border)"
     }
-  }, "Copy Stats"), /*#__PURE__*/React.createElement("button", {
-    onClick: onClose,
-    style: {
-      padding: "8px 24px",
-      borderRadius: 8,
-      fontSize: 13,
-      fontWeight: 700,
-      background: "linear-gradient(135deg,#c084fc,#818cf8)",
-      color: "#fff",
-      border: "2px solid #8b5cf6"
-    }
-  }, "Close"))));
+  }, "Copy Stats"))));
 }
 
 /* ═══════════ STARFIELD BACKGROUND ═══════════════════════════════ */
@@ -2629,15 +2642,16 @@ function BackBtn({
       position: "absolute",
       top: 14,
       left: 14,
-      padding: "7px 16px",
-      borderRadius: 9,
-      background: "var(--surface2)",
+      padding: "8px 18px",
+      borderRadius: 10,
+      background: "var(--surface)",
       color: "var(--text)",
-      fontSize: 13,
-      fontWeight: 600,
-      border: "1px solid var(--border)",
-      zIndex: 10,
-      backdropFilter: "blur(8px)"
+      fontSize: 14,
+      fontWeight: 700,
+      border: "2px solid var(--border)",
+      zIndex: 50,
+      backdropFilter: "blur(12px)",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.4)"
     }
   }, "\u2190 Back");
 }
@@ -9817,6 +9831,14 @@ function Scarab({
 function BalanceGraph({
   history
 }) {
+  var [graphRange, setGraphRange] = useState(50);
+  var [expanded, setExpanded] = useState(false);
+  var scrollRef = useRef(null);
+  var dragRef = useRef({
+    dragging: false,
+    startX: 0,
+    scrollLeft: 0
+  });
   if (!history || history.length < 2) return /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
@@ -9825,38 +9847,221 @@ function BalanceGraph({
       fontSize: 12
     }
   }, "Play more games to see your balance graph");
-  var data = history.slice(-50);
+  var data = graphRange === 0 ? history : history.slice(-graphRange);
   var min = Math.min.apply(null, data);
   var max = Math.max.apply(null, data);
   var range = max - min || 1;
-  var w = 280,
-    h = 100,
-    pad = 5;
+  var graphW = expanded ? Math.max(600, data.length * 6) : 280;
+  var graphH = expanded ? 200 : 100;
+  var pad = 5;
   var points = data.map(function (v, i) {
-    var x = pad + i / (data.length - 1) * (w - pad * 2);
-    var y = h - pad - (v - min) / range * (h - pad * 2);
+    var x = pad + i / (data.length - 1) * (graphW - pad * 2);
+    var y = graphH - pad - (v - min) / range * (graphH - pad * 2);
     return x + "," + y;
   }).join(" ");
   var lastVal = data[data.length - 1];
   var firstVal = data[0];
   var color = lastVal >= firstVal ? "var(--green)" : "var(--accent)";
+  var ranges = [50, 100, 200, 0];
+  var rangeLabels = ["50", "100", "200", "All"];
+  function onMouseDown(e) {
+    var el = scrollRef.current;
+    if (!el) return;
+    dragRef.current = {
+      dragging: true,
+      startX: e.pageX - el.offsetLeft,
+      scrollLeft: el.scrollLeft
+    };
+  }
+  function onMouseMove(e) {
+    if (!dragRef.current.dragging) return;
+    e.preventDefault();
+    var el = scrollRef.current;
+    if (!el) return;
+    var x = e.pageX - el.offsetLeft;
+    el.scrollLeft = dragRef.current.scrollLeft - (x - dragRef.current.startX);
+  }
+  function onMouseUp() {
+    dragRef.current.dragging = false;
+  }
+  var rangeBar = /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 4,
+      marginBottom: 8
+    }
+  }, ranges.map(function (r, i) {
+    var active = graphRange === r;
+    return /*#__PURE__*/React.createElement("button", {
+      key: r,
+      onClick: function (e) {
+        e.stopPropagation();
+        setGraphRange(r);
+      },
+      style: {
+        padding: "3px 10px",
+        borderRadius: 6,
+        fontSize: 10,
+        fontWeight: 700,
+        background: active ? "rgba(86,193,255,0.15)" : "var(--surface)",
+        color: active ? "var(--cool)" : "var(--dim)",
+        border: active ? "1px solid var(--cool)" : "1px solid var(--border)"
+      }
+    }, rangeLabels[i]);
+  }));
+  if (expanded) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "fixed",
+        inset: 0,
+        zIndex: 250,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0,0,0,0.8)",
+        backdropFilter: "blur(6px)"
+      },
+      onClick: function () {
+        setExpanded(false);
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: function (e) {
+        e.stopPropagation();
+      },
+      style: {
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: 16,
+        padding: 18,
+        width: "94%",
+        maxWidth: 600,
+        animation: "fadeUp 0.25s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "var(--dim)"
+      }
+    }, "📈 Balance History (" + data.length + " games)"), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        setExpanded(false);
+      },
+      style: {
+        width: 28,
+        height: 28,
+        borderRadius: 7,
+        background: "var(--surface2)",
+        border: "1px solid var(--border)",
+        color: "var(--dim)",
+        fontSize: 14,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, "✕")), rangeBar, /*#__PURE__*/React.createElement("div", {
+      ref: scrollRef,
+      onMouseDown: onMouseDown,
+      onMouseMove: onMouseMove,
+      onMouseUp: onMouseUp,
+      onMouseLeave: onMouseUp,
+      style: {
+        overflowX: "auto",
+        overflowY: "hidden",
+        cursor: "grab",
+        WebkitOverflowScrolling: "touch",
+        borderRadius: 8,
+        background: "var(--surface2)",
+        padding: 8,
+        border: "1px solid var(--border)"
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      viewBox: "0 0 " + graphW + " " + graphH,
+      style: {
+        width: graphW,
+        height: graphH,
+        display: "block"
+      }
+    }, /*#__PURE__*/React.createElement("polyline", {
+      points: points,
+      fill: "none",
+      stroke: color,
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }), data.map(function (v, i) {
+      var x = pad + i / (data.length - 1) * (graphW - pad * 2);
+      var y = graphH - pad - (v - min) / range * (graphH - pad * 2);
+      return i === data.length - 1 ? /*#__PURE__*/React.createElement("circle", {
+        key: i,
+        cx: x,
+        cy: y,
+        r: "4",
+        fill: color
+      }) : i === 0 ? /*#__PURE__*/React.createElement("circle", {
+        key: i,
+        cx: x,
+        cy: y,
+        r: "3",
+        fill: "var(--dim)"
+      }) : null;
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        fontSize: 11,
+        color: "var(--dim)",
+        fontFamily: "'JetBrains Mono',monospace",
+        marginTop: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", null, "Start: ", firstVal), /*#__PURE__*/React.createElement("span", null, "Min: ", min), /*#__PURE__*/React.createElement("span", null, "Max: ", max), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: color,
+        fontWeight: 700
+      }
+    }, "Now: ", lastVal))));
+  }
   return /*#__PURE__*/React.createElement("div", {
+    onClick: function () {
+      setExpanded(true);
+    },
     style: {
       marginTop: 12,
       padding: 12,
       background: "var(--surface2)",
       borderRadius: 10,
-      border: "1px solid var(--border)"
+      border: "1px solid var(--border)",
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       fontWeight: 700,
-      color: "var(--dim)",
-      marginBottom: 6
+      color: "var(--dim)"
     }
-  }, "\uD83D\uDCC8 Balance History (last 50)"), /*#__PURE__*/React.createElement("svg", {
-    viewBox: "0 0 " + w + " " + h,
+  }, "📈 Balance History"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: "var(--cool)",
+      fontWeight: 600
+    }
+  }, "Tap to expand")), rangeBar, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 " + graphW + " " + graphH,
     style: {
       width: "100%",
       height: 80
@@ -9869,8 +10074,8 @@ function BalanceGraph({
     strokeLinecap: "round",
     strokeLinejoin: "round"
   }), data.map(function (v, i) {
-    var x = pad + i / (data.length - 1) * (w - pad * 2);
-    var y = h - pad - (v - min) / range * (h - pad * 2);
+    var x = pad + i / (data.length - 1) * (graphW - pad * 2);
+    var y = graphH - pad - (v - min) / range * (graphH - pad * 2);
     return i === data.length - 1 ? /*#__PURE__*/React.createElement("circle", {
       key: i,
       cx: x,
@@ -9915,55 +10120,55 @@ function ShareCard({
     var c = canvasRef.current;
     if (!c) return;
     var ctx = c.getContext("2d");
-    c.width = 400;
-    c.height = 300;
-    var g = ctx.createLinearGradient(0, 0, 400, 300);
+    c.width = 420;
+    c.height = 310;
+    var g = ctx.createLinearGradient(0, 0, 420, 310);
     g.addColorStop(0, "#0e0e18");
     g.addColorStop(0.5, "#1a0a2e");
     g.addColorStop(1, "#0e0e18");
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 400, 300);
-    /* decorative line */
+    ctx.fillRect(0, 0, 420, 310);
+    /* decorative lines */
     ctx.strokeStyle = "#c084fc33";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(20, 55);
-    ctx.lineTo(380, 55);
+    ctx.lineTo(400, 55);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(20, 115);
-    ctx.lineTo(380, 115);
+    ctx.moveTo(20, 105);
+    ctx.lineTo(400, 105);
     ctx.stroke();
     /* header */
     ctx.fillStyle = "#c084fc";
-    ctx.font = "bold 28px serif";
-    ctx.fillText("✦ Flux", 20, 40);
+    ctx.font = "bold 26px serif";
+    ctx.fillText("✦ FluxBucks", 20, 40);
     ctx.fillStyle = "#888";
     ctx.font = "11px monospace";
-    ctx.fillText(VERSION, 120, 40);
+    ctx.fillText(VERSION, 180, 40);
     /* user info */
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 20px sans-serif";
-    ctx.fillText(avatar + " " + (username || "Player"), 20, 80);
-    /* level badge */
+    ctx.font = "bold 18px sans-serif";
+    ctx.fillText(avatar + " " + (username || "Player"), 20, 78);
+    /* level + chips + streak on same row, spaced properly */
     ctx.fillStyle = li.titleColor;
-    ctx.font = "bold 13px monospace";
-    ctx.fillText("Lv." + li.level + " " + li.title, 20, 100);
-    /* streak + chips */
+    ctx.font = "bold 12px monospace";
+    ctx.fillText("Lv." + li.level + " " + li.title, 20, 96);
     ctx.fillStyle = "#fbbf24";
-    ctx.font = "bold 14px monospace";
-    ctx.fillText("🪙 " + chips, 200, 100);
+    ctx.font = "bold 12px monospace";
+    ctx.fillText("🪙 " + chips, 170, 96);
     if (dailyStreak > 0) {
       ctx.fillStyle = "#ff5e78";
-      ctx.fillText("🔥 " + dailyStreak + "d streak", 300, 100);
+      ctx.font = "bold 12px monospace";
+      ctx.fillText("🔥 " + dailyStreak + "d", 290, 96);
     }
-    /* stats grid */
+    /* stats grid - 3 cols, 2 rows */
     var items = [["Games", s.gamesPlayed || 0], ["Win Rate", winRate + "%"], ["Net", (netProfit >= 0 ? "+" : "") + netProfit], ["Best Win", "+" + (s.biggestWin || 0)], ["Best Streak", s.longestWinStreak || 0], ["Achievements", (achievements || []).length]];
     items.forEach(function (item, i) {
       var col = i % 3,
         row = Math.floor(i / 3);
-      var x = 20 + col * 125,
-        y = 140 + row * 55;
+      var x = 20 + col * 133,
+        y = 130 + row * 55;
       ctx.fillStyle = "#666";
       ctx.font = "10px sans-serif";
       ctx.fillText(item[0], x, y);
@@ -9974,20 +10179,55 @@ function ShareCard({
     /* XP bar */
     ctx.fillStyle = "#222";
     ctx.beginPath();
-    ctx.roundRect(20, 260, 360, 8, 4);
+    ctx.roundRect(20, 265, 380, 8, 4);
     ctx.fill();
     ctx.fillStyle = li.titleColor;
     ctx.beginPath();
-    ctx.roundRect(20, 260, Math.max(4, 360 * li.progress), 8, 4);
+    ctx.roundRect(20, 265, Math.max(4, 380 * li.progress), 8, 4);
     ctx.fill();
     ctx.fillStyle = "#555";
     ctx.font = "9px monospace";
-    ctx.fillText(li.xpInLevel + "/" + li.xpForNext + " XP", 20, 285);
+    ctx.fillText(li.xpInLevel + "/" + li.xpForNext + " XP", 20, 290);
     /* footer */
     ctx.fillStyle = "#333";
     ctx.font = "9px monospace";
-    ctx.fillText("novalux · " + new Date().toLocaleDateString(), 240, 285);
+    ctx.fillText("FluxBucks · " + new Date().toLocaleDateString(), 260, 290);
   }, []);
+  function saveImage() {
+    var c = canvasRef.current;
+    if (!c) return;
+    c.toBlob(function (blob) {
+      if (!blob) return;
+      /* Try native share (mobile) first, then download */
+      if (navigator.share && navigator.canShare) {
+        var file = new File([blob], "fluxbucks-stats.png", {
+          type: "image/png"
+        });
+        if (navigator.canShare({
+          files: [file]
+        })) {
+          navigator.share({
+            files: [file],
+            title: "FluxBucks Stats"
+          }).catch(function () {
+            downloadBlob(blob);
+          });
+          return;
+        }
+      }
+      downloadBlob(blob);
+    });
+  }
+  function downloadBlob(blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.download = "fluxbucks-stats.png";
+    a.href = url;
+    a.click();
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 1000);
+  }
   function copyImage() {
     var c = canvasRef.current;
     if (!c) return;
@@ -10003,14 +10243,6 @@ function ShareCard({
         });
       }
     });
-  }
-  function downloadImage() {
-    var c = canvasRef.current;
-    if (!c) return;
-    var a = document.createElement("a");
-    a.download = "flux-stats.png";
-    a.href = c.toDataURL("image/png");
-    a.click();
   }
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -10034,13 +10266,13 @@ function ShareCard({
       padding: 20,
       animation: "fadeUp 0.25s",
       textAlign: "center",
-      maxWidth: "90vw"
+      maxWidth: "92vw"
     }
   }, /*#__PURE__*/React.createElement("canvas", {
     ref: canvasRef,
     style: {
       width: "100%",
-      maxWidth: 400,
+      maxWidth: 420,
       borderRadius: 10,
       marginBottom: 10
     }
@@ -10062,7 +10294,7 @@ function ShareCard({
       border: "1px solid var(--border)"
     }
   }, copied ? "Copied!" : "📋 Copy"), /*#__PURE__*/React.createElement("button", {
-    onClick: downloadImage,
+    onClick: saveImage,
     style: {
       padding: "8px 18px",
       borderRadius: 8,
@@ -10092,6 +10324,7 @@ function UpdateBanner({
 }) {
   var [newVersion, setNewVersion] = useState(null);
   var [dismissed, setDismissed] = useState(false);
+  var [updating, setUpdating] = useState(false);
   function parseVer(v) {
     var m = (v || "").match(/^v?(\d+)\.(\d+)\.(\d+)/);
     if (!m) return null;
@@ -10114,6 +10347,31 @@ function UpdateBanner({
       if (v && v.startsWith("v") && isNewer(v, currentVersion)) setNewVersion(v);
     }).catch(function () {});
   }, []);
+  function doUpdate() {
+    setUpdating(true);
+    /* Clear all SW caches then unregister, then hard reload */
+    if ('caches' in window) {
+      caches.keys().then(function (names) {
+        return Promise.all(names.map(function (n) {
+          return caches.delete(n);
+        }));
+      }).then(function () {
+        if ('serviceWorker' in navigator) {
+          return navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (r) {
+              return r.unregister();
+            }));
+          });
+        }
+      }).then(function () {
+        window.location.href = window.location.href.split("?")[0] + "?update=" + Date.now();
+      }).catch(function () {
+        window.location.href = window.location.href.split("?")[0] + "?update=" + Date.now();
+      });
+    } else {
+      window.location.href = window.location.href.split("?")[0] + "?update=" + Date.now();
+    }
+  }
   if (!newVersion || dismissed) return null;
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -10143,9 +10401,8 @@ function UpdateBanner({
       gap: 6
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      window.location.reload(true);
-    },
+    onClick: doUpdate,
+    disabled: updating,
     style: {
       padding: "5px 14px",
       borderRadius: 7,
@@ -10153,9 +10410,10 @@ function UpdateBanner({
       fontWeight: 700,
       background: "#fff",
       color: "#4f46e5",
-      border: "none"
+      border: "none",
+      opacity: updating ? 0.6 : 1
     }
-  }, "Update"), /*#__PURE__*/React.createElement("button", {
+  }, updating ? "Updating..." : "Update"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setDismissed(true);
     },
@@ -10511,6 +10769,118 @@ function DebtPopup({
       marginTop: 4
     }
   }, "Cancel"))));
+}
+function HelpPage({
+  onClose
+}) {
+  var sections = [{
+    title: "🪙 Chips",
+    text: "Chips are your virtual currency. You start with 500. Win games to earn more, lose games and they go down. Chips have no real-world value — it's all for fun."
+  }, {
+    title: "⭐ XP & Levels",
+    text: "You earn XP by playing games. Winning gives +10 to +25 XP depending on the game type (skill games give more). Losing costs -5 to -10 XP based on your losing streak in that game. XP can never go below 0. As you earn XP, you level up through ranks: Rookie → Regular (Lv.5) → Veteran (Lv.10) → Expert (Lv.15) → Master (Lv.20) → Legend (Lv.30) → Flux God (Lv.40)."
+  }, {
+    title: "🔥 Daily Streak",
+    text: "Open the game once a day to keep your streak going. Play today and come back tomorrow — your streak grows. Miss a day and it resets to 1. Higher streaks give bigger chip bonuses: Day 1 = 50, Day 2 = 100, Day 3 = 200, Day 4 = 300, Day 5 = 400, Day 6+ = 500 chips."
+  }, {
+    title: "🏆 Achievements",
+    text: "There are hidden achievements for reaching milestones like playing a certain number of games, hitting win streaks, reaching chip amounts, and more. They pop up in the corner when you unlock them."
+  }, {
+    title: "📈 Balance Graph",
+    text: "Found in Stats, this tracks your chip balance over time. Tap it to expand and scroll through your history. Use the range buttons (50, 100, 200, All) to see different time spans."
+  }, {
+    title: "🎮 Game Types",
+    text: "CARDS = card-based games, LUCK = pure chance, RISK = high risk/reward, SKILL = skill-based (earn more XP), INSTANT = quick results, LOTTERY = number picks, REFLEX = speed tests, BRAIN = puzzles, MEMORY = memory games, WORDS = word games, CRASH = multiplier games, PACKS = lootbox opening."
+  }, {
+    title: "🎨 Customization",
+    text: "Change your theme, avatar, and background in Settings or through the quick buttons in your profile popup (tap your name at the bottom left)."
+  }, {
+    title: "📤 Share Card",
+    text: "Tap Share in your profile to generate an image card with your stats. Save it to your photos or copy it to share with friends."
+  }, {
+    title: "🔧 Troubleshooting",
+    text: "If anything gets stuck, open Settings and tap 'Force Main Menu' to reset to the home screen. 'Refresh App' clears the cache and reloads everything fresh."
+  }];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 200,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.7)",
+      backdropFilter: "blur(4px)"
+    },
+    onClick: function (e) {
+      if (e.target === e.currentTarget) onClose();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      borderRadius: 18,
+      padding: 20,
+      width: "94%",
+      maxWidth: 420,
+      maxHeight: "88vh",
+      overflow: "auto",
+      animation: "fadeUp 0.25s"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("h2", {
+    style: {
+      fontFamily: "'Playfair Display',serif",
+      fontSize: 18,
+      fontWeight: 900,
+      fontStyle: "italic",
+      color: "var(--text)"
+    }
+  }, "❓ How It Works"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      background: "var(--surface2)",
+      border: "1px solid var(--border)",
+      color: "var(--dim)",
+      fontSize: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, "✕")), sections.map(function (sec, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        marginBottom: 14,
+        padding: "12px 14px",
+        background: "var(--surface2)",
+        borderRadius: 10,
+        border: "1px solid var(--border)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 700,
+        color: "var(--text)",
+        marginBottom: 6
+      }
+    }, sec.title), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "var(--dim)",
+        lineHeight: 1.6
+      }
+    }, sec.text));
+  })));
 }
 function InfoPanel({
   onClose
@@ -11147,6 +11517,9 @@ function LevelUpOverlay({
 }) {
   var [phase, setPhase] = useState("burst");
   useEffect(function () {
+    try {
+      playSound("jackpot");
+    } catch (e) {}
     var t1 = setTimeout(function () {
       setPhase("show");
     }, 400);
@@ -11162,10 +11535,8 @@ function LevelUpOverlay({
       clearTimeout(t3);
     };
   }, []);
-  try {
-    playSound("jackpot");
-  } catch (e) {}
   return /*#__PURE__*/React.createElement("div", {
+    onClick: onDone,
     style: {
       position: "fixed",
       inset: 0,
@@ -11177,7 +11548,7 @@ function LevelUpOverlay({
       backdropFilter: "blur(8px)",
       opacity: phase === "fade" ? 0 : 1,
       transition: "opacity 0.6s ease-out",
-      pointerEvents: "none"
+      cursor: "pointer"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -11454,6 +11825,7 @@ function FluxApp() {
   const [safeMode, setSafeMode] = useState(save.safeMode || false);
   const [debtPopup, setDebtPopup] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
@@ -11497,6 +11869,7 @@ function FluxApp() {
   const [showDailyStreak, setShowDailyStreak] = useState(false);
   const [dailyBonusAmount, setDailyBonusAmount] = useState(0);
   const [levelUpData, setLevelUpData] = useState(null);
+  const lastLevelUpShownRef = useRef(getLevelInfo(save.xp || 0).level);
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const [sessionActive, setSessionActive] = useState(true);
   const [showAFK, setShowAFK] = useState(false);
@@ -11551,7 +11924,7 @@ function FluxApp() {
       bgPreset: bgPreset,
       achievements: achievements,
       betHistory: betHistory.slice(-50),
-      balanceHistory: balanceHistory.slice(-100),
+      balanceHistory: balanceHistory.slice(-500),
       collection: collection,
       stats: stats,
       xp: xp,
@@ -11611,7 +11984,8 @@ function FluxApp() {
     try {
       if (xpChange > 0) playSound("xpGain");else if (xpChange < 0) playSound("xpLose");
     } catch (e) {}
-    if (newLevel.level > oldLevel.level) {
+    if (newLevel.level > oldLevel.level && newLevel.level > lastLevelUpShownRef.current) {
+      lastLevelUpShownRef.current = newLevel.level;
       setTimeout(function () {
         setLevelUpData({
           level: newLevel.level,
@@ -12134,7 +12508,7 @@ function FluxApp() {
       opacity: hubPhase === "cards" ? 1 : 0,
       transition: "opacity 0.5s ease-out 2s"
     }
-  }, safeMode ? "All games are skill-based" : "All games use virtual chips · No real money")), splash === "done" && /*#__PURE__*/React.createElement("button", {
+  }, safeMode ? "All games are skill-based" : "All games use virtual chips · No real money")), splash === "done" && !showSettings && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setEditUsername(username);
       setShowSettings(true);
@@ -12153,12 +12527,12 @@ function FluxApp() {
       justifyContent: "center",
       fontSize: isWide ? 22 : 20,
       color: "var(--dim)",
-      zIndex: 600,
+      zIndex: 700,
       backdropFilter: "blur(8px)",
       boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
       opacity: 0.6
     }
-  }, "\u2699\uFE0F"), splash === "done" && username && /*#__PURE__*/React.createElement("button", {
+  }, "\u2699\uFE0F"), splash === "done" && !showSettings && username && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowProfile(true);
     },
@@ -12176,7 +12550,7 @@ function FluxApp() {
       padding: "0 14px 0 10px",
       fontSize: 13,
       color: "var(--neon)",
-      zIndex: 600,
+      zIndex: 700,
       backdropFilter: "blur(8px)",
       boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
       fontFamily: "'JetBrains Mono',monospace",
@@ -12987,7 +13361,43 @@ function FluxApp() {
     }
   }, "\u2139\uFE0F Credits"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
-      window.location.reload();
+      setUsername(editUsername);
+      setShowHelp(true);
+      setShowSettings(false);
+    },
+    style: {
+      padding: "10px 12px",
+      borderRadius: 10,
+      fontSize: 12,
+      fontWeight: 700,
+      background: "var(--surface2)",
+      color: "var(--cool)",
+      border: "1px solid rgba(86,193,255,0.3)",
+      textAlign: "center"
+    }
+  }, "\u2753 How It Works"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if ('caches' in window) {
+        caches.keys().then(function (n) {
+          return Promise.all(n.map(function (k) {
+            return caches.delete(k);
+          }));
+        }).then(function () {
+          if ('serviceWorker' in navigator) {
+            return navigator.serviceWorker.getRegistrations().then(function (r) {
+              return Promise.all(r.map(function (reg) {
+                return reg.unregister();
+              }));
+            });
+          }
+        }).then(function () {
+          window.location.href = window.location.href.split("?")[0] + "?refresh=" + Date.now();
+        }).catch(function () {
+          window.location.reload();
+        });
+      } else {
+        window.location.reload();
+      }
     },
     style: {
       padding: "10px 12px",
@@ -13000,6 +13410,24 @@ function FluxApp() {
       textAlign: "center"
     }
   }, "\u21BB Refresh App"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setGame(null);
+      setLevelUpData(null);
+      setShowDailyStreak(false);
+      setShowAFK(false);
+      closeSettings();
+    },
+    style: {
+      padding: "10px 12px",
+      borderRadius: 10,
+      fontSize: 12,
+      fontWeight: 700,
+      background: "var(--surface2)",
+      color: "var(--neon2)",
+      border: "1px solid rgba(255,207,86,0.3)",
+      textAlign: "center"
+    }
+  }, "\uD83C\uDFE0 Force Main Menu"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowResetConfirm(true);
     },
@@ -13402,6 +13830,10 @@ function FluxApp() {
   }, "Done")))), showInfo && /*#__PURE__*/React.createElement(InfoPanel, {
     onClose: function () {
       setShowInfo(false);
+    }
+  }), showHelp && /*#__PURE__*/React.createElement(HelpPage, {
+    onClose: function () {
+      setShowHelp(false);
     }
   }), showAchievements && /*#__PURE__*/React.createElement(AchievementViewer, {
     unlocked: achievements,
