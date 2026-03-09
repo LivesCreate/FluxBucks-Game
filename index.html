@@ -24,7 +24,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.6.0";
+const VERSION = "v4.7.0";
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -791,7 +791,10 @@ var XP_WIN = {
   wordscramble: 25,
   aimtrainer: 25,
   typingspeed: 25,
-  packs: 10
+  packs: 10,
+  roulette: 20,
+  stocks: 22,
+  bomb: 20
 };
 function getXpForLevel(lvl) {
   return lvl * 50;
@@ -9604,20 +9607,22 @@ function Packs({
   function openPack() {
     if (phase === "rolling") return;
     if (phase === "reveal") {
+      /* Reset first, then start fresh on next frame */
       setPhase("idle");
       setFinalItem(null);
       setResult(null);
       setReelItems([]);
       setReelOffset(0);
+      setTimeout(function () {
+        if (checkDebt(COST, chips, function () {}, setDebtPopup, doOpen)) return;
+        doOpen();
+      }, 50);
+      return;
     }
-    function doIt() {
-      doOpen();
-    }
-    if (checkDebt(COST, chips, function () {}, setDebtPopup, doIt)) return;
+    if (checkDebt(COST, chips, function () {}, setDebtPopup, doOpen)) return;
     doOpen();
   }
   function doOpen() {
-    setPhase("rolling");
     setResult(null);
     setFinalItem(null);
     playSound("click");
@@ -9628,14 +9633,14 @@ function Packs({
     var reel = buildReel(item);
     setReelItems(reel.items);
     setWinPos(reel.winPos);
-    var containerW = containerRef.current ? containerRef.current.offsetWidth : 300;
-    var targetX = reel.winPos * ITEM_TOTAL - containerW / 2 + ITEM_W / 2;
     setReelOffset(0);
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        setReelOffset(-targetX);
-      });
-    });
+    setPhase("rolling");
+    /* Wait for DOM to render the reel at position 0, then animate */
+    setTimeout(function () {
+      var containerW = containerRef.current ? containerRef.current.offsetWidth : 300;
+      var targetX = reel.winPos * ITEM_TOTAL - containerW / 2 + ITEM_W / 2;
+      setReelOffset(-targetX);
+    }, 60);
     setTimeout(function () {
       setFinalItem(item);
       setPhase("reveal");
@@ -9848,6 +9853,969 @@ function Packs({
   })), /*#__PURE__*/React.createElement(GameGuide, {
     items: PK_G,
     title: "Packs Guide"
+  }));
+}
+
+/* ═══ GAME: RUSSIAN ROULETTE ═════════════════════════════════════ */
+function RussianRoulette({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [chambers, setChambers] = useState(6);
+  var [chamber, setChamber] = useState(0);
+  var [bulletPos, setBulletPos] = useState(-1);
+  var [phase, setPhase] = useState("bet");
+  var [result, setResult] = useState(null);
+  var [pullState, setPullState] = useState(null);
+  var MULTI_MAP = {
+    4: [0, 0.5, 1.5, 5],
+    6: [0, 0.3, 0.8, 1.5, 3, 8],
+    8: [0, 0.2, 0.5, 1, 1.8, 3, 5, 12]
+  };
+  function startGame() {
+    function doIt() {
+      setBulletPos(Math.floor(Math.random() * chambers));
+      setChamber(0);
+      setResult(null);
+      setPullState(null);
+      setPhase("play");
+      setChips(function (c) {
+        return c - bet;
+      });
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doIt();
+  }
+  function pullTrigger() {
+    if (pullState) return;
+    setPullState("pulling");
+    playSound("click");
+    setTimeout(function () {
+      if (chamber === bulletPos) {
+        setPullState("dead");
+        playSound("lose");
+        vib([100, 50, 100, 50, 200]);
+        setTimeout(function () {
+          setResult({
+            type: "lose",
+            text: "BANG! Lost " + bet + " chips"
+          });
+          setPhase("result");
+          if (trackResult) trackResult({
+            event: "lose",
+            game: "roulette",
+            bet: bet,
+            profit: -bet
+          });
+        }, 1500);
+      } else {
+        setPullState("blank");
+        playSound("reveal");
+        vib([30]);
+        var survived = chamber + 1;
+        setChamber(survived);
+        var multis = MULTI_MAP[chambers];
+        if (survived >= chambers - 1) {
+          var win = Math.floor(bet * multis[survived]);
+          setTimeout(function () {
+            setPullState(null);
+            setChips(function (c) {
+              return c + win;
+            });
+            setResult({
+              type: "win",
+              text: "SURVIVED ALL " + chambers + "! +" + win + " chips!"
+            });
+            setPhase("result");
+            playSound("jackpot");
+            if (trackResult) trackResult({
+              event: "win",
+              game: "roulette",
+              bet: bet,
+              profit: win
+            });
+          }, 1200);
+        } else {
+          var cashVal = Math.floor(bet * multis[survived]);
+          setTimeout(function () {
+            setPullState(null);
+            setResult({
+              type: "win",
+              text: "Click! " + survived + "/" + chambers + (cashVal > 0 ? " · Cash out: +" + cashVal : "")
+            });
+          }, 1200);
+        }
+      }
+    }, 900);
+  }
+  function cashOut() {
+    var multis = MULTI_MAP[chambers];
+    var win = Math.floor(bet * (multis[chamber] || 0));
+    setChips(function (c) {
+      return c + win;
+    });
+    playSound("cash");
+    setResult({
+      type: win > 0 ? "win" : "lose",
+      text: "Cashed out! " + (win > 0 ? "+" + win : "-" + (bet - win)) + " chips"
+    });
+    setPhase("result");
+    if (trackResult) trackResult({
+      event: win > 0 ? "win" : "lose",
+      game: "roulette",
+      bet: bet,
+      profit: win > 0 ? win : -(bet - win)
+    });
+  }
+  var RR_G = [{
+    t: "Chambers",
+    d: "Choose 4, 6, or 8 chambers. More chambers = higher max payout but more clicks to get there."
+  }, {
+    t: "Pull or Cash Out",
+    d: "Each surviving click increases your multiplier. Cash out anytime or keep pushing."
+  }, {
+    t: "Payouts (6 chambers)",
+    d: "1 click: 0.3x, 2: 0.8x, 3: 1.5x, 4: 3x, Survive all 5: 8x"
+  }];
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "\uD83D\uDD2B Russian Roulette",
+    titleColor: "#ef4444",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, phase === "bet" && /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "var(--dim)",
+      marginBottom: 14,
+      fontSize: 14
+    }
+  }, "Pull the trigger. Survive for multipliers."), /*#__PURE__*/React.createElement(BrokeBanner, {
+    chips: chips,
+    setChips: setChips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, [4, 6, 8].map(function (n) {
+    return /*#__PURE__*/React.createElement("button", {
+      key: n,
+      onClick: function () {
+        setChambers(n);
+      },
+      style: {
+        padding: "8px 18px",
+        borderRadius: 8,
+        fontSize: 13,
+        fontWeight: 700,
+        background: chambers === n ? "#ef4444" + "25" : "var(--surface2)",
+        color: chambers === n ? "#ef4444" : "var(--dim)",
+        border: chambers === n ? "2px solid #ef4444" : "1px solid var(--border)"
+      }
+    }, n + " chambers");
+  })), /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: startGame,
+    color: "#ef4444",
+    glow: true
+  }, "Spin Cylinder"))), phase === "play" && /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      gap: 6,
+      marginBottom: 16,
+      flexWrap: "wrap"
+    }
+  }, Array.from({
+    length: chambers
+  }).map(function (_, i) {
+    var state = i < chamber ? "survived" : i === chamber ? "current" : "unknown";
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        width: 38,
+        height: 38,
+        borderRadius: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 16,
+        fontWeight: 700,
+        background: state === "survived" ? "rgba(74,222,128,0.2)" : state === "current" ? "rgba(239,68,68,0.15)" : "var(--surface2)",
+        border: "2px solid " + (state === "survived" ? "var(--green)" : state === "current" ? "#ef4444" : "var(--border)"),
+        transition: "all 0.3s"
+      }
+    }, state === "survived" ? "✓" : i + 1);
+  })), pullState === "pulling" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 64,
+      marginBottom: 12,
+      animation: "pulse 0.3s infinite"
+    }
+  }, "🔄"), pullState === "dead" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 72,
+      animation: "popBounce 0.5s"
+    }
+  }, "💀"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 28,
+      fontWeight: 900,
+      color: "#ef4444",
+      fontFamily: "'Playfair Display',serif",
+      marginTop: 8,
+      animation: "fadeUp 0.3s"
+    }
+  }, "BANG!"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "var(--dim)",
+      marginTop: 4
+    }
+  }, "The bullet was in chamber ", bulletPos + 1)), pullState === "blank" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 64,
+      animation: "popBounce 0.4s"
+    }
+  }, "😮‍💨"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 800,
+      color: "var(--green)",
+      marginTop: 4,
+      animation: "fadeUp 0.3s"
+    }
+  }, "*click* \u2014 Empty!")), !pullState && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 48,
+      marginBottom: 12
+    }
+  }, "🔫"), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    text: result.text,
+    type: result.type,
+    show: true
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center",
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: pullTrigger,
+    color: "#ef4444",
+    glow: true,
+    disabled: !!pullState
+  }, "Pull Trigger"), chamber > 0 && !pullState && /*#__PURE__*/React.createElement(Btn, {
+    onClick: cashOut,
+    color: "var(--green)"
+  }, "Cash Out"))), phase === "result" && /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, result && /*#__PURE__*/React.createElement(ResultBanner, {
+    text: result.text,
+    type: result.type,
+    show: true
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16,
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: function () {
+      setPhase("bet");
+      setResult(null);
+      setPullState(null);
+    },
+    color: "var(--neon)"
+  }, "Play Again"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: onBack,
+    color: "var(--dim)"
+  }, "Exit"))), /*#__PURE__*/React.createElement(GameGuide, {
+    items: RR_G,
+    title: "Roulette Guide"
+  }));
+}
+
+/* ═══ GAME: STOCK TRADER ════════════════════════════════════════ */
+function StockTrader({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [phase, setPhase] = useState("bet");
+  var [price, setPrice] = useState(100);
+  var [history, setHistory] = useState([100]);
+  var [holding, setHolding] = useState(false);
+  var [buyPrice, setBuyPrice] = useState(0);
+  var [timeLeft, setTimeLeft] = useState(30);
+  var [result, setResult] = useState(null);
+  var [trades, setTrades] = useState(0);
+  var timerRef = useRef(null);
+  var priceRef = useRef(null);
+  var phaseRef = useRef("bet");
+  function startGame() {
+    function doIt() {
+      setPrice(100);
+      setHistory([100]);
+      setHolding(false);
+      setBuyPrice(0);
+      setTimeLeft(30);
+      setResult(null);
+      setTrades(0);
+      setPhase("play");
+      phaseRef.current = "play";
+      setChips(function (c) {
+        return c - bet;
+      });
+      priceRef.current = setInterval(function () {
+        setPrice(function (p) {
+          var change = (Math.random() - 0.47) * 8;
+          var newP = Math.max(10, Math.min(300, Math.round(p + change)));
+          setHistory(function (h) {
+            return h.concat([newP]).slice(-60);
+          });
+          return newP;
+        });
+      }, 500);
+      timerRef.current = setInterval(function () {
+        setTimeLeft(function (t) {
+          if (t <= 1) {
+            clearInterval(timerRef.current);
+            clearInterval(priceRef.current);
+            return 0;
+          }
+          return t - 1;
+        });
+      }, 1000);
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doIt();
+  }
+  useEffect(function () {
+    if (timeLeft === 0 && phaseRef.current === "play") {
+      phaseRef.current = "result";
+      if (holding) {
+        doSell();
+      } else {
+        endGame(-bet, "Time's up! You didn't trade. -" + bet);
+      }
+    }
+  }, [timeLeft]);
+  useEffect(function () {
+    return function () {
+      clearInterval(timerRef.current);
+      clearInterval(priceRef.current);
+    };
+  }, []);
+  function buy() {
+    if (holding || timeLeft <= 0) return;
+    setHolding(true);
+    setBuyPrice(price);
+    setTrades(function (t) {
+      return t + 1;
+    });
+    playSound("click");
+  }
+  function doSell() {
+    clearInterval(timerRef.current);
+    clearInterval(priceRef.current);
+    setHolding(false);
+    var profit = Math.floor((price - buyPrice) / 100 * bet);
+    if (profit > 0) {
+      endGame(profit, "Sold at $" + price + " (bought $" + buyPrice + ") +" + profit + " chips!");
+    } else if (profit < 0) {
+      endGame(profit, "Sold at $" + price + " (bought $" + buyPrice + ") " + profit + " chips");
+    } else {
+      endGame(0, "Sold at $" + price + " — broke even. Entry fee lost.");
+    }
+  }
+  function sell() {
+    if (!holding) return;
+    phaseRef.current = "result";
+    doSell();
+  }
+  function endGame(profit, text) {
+    setPhase("result");
+    phaseRef.current = "result";
+    if (profit > 0) {
+      setChips(function (c) {
+        return c + profit;
+      });
+      setResult({
+        type: "win",
+        text: text
+      });
+      playSound("win");
+      if (trackResult) trackResult({
+        event: "win",
+        game: "stocks",
+        bet: bet,
+        profit: profit
+      });
+    } else {
+      setResult({
+        type: "lose",
+        text: text
+      });
+      playSound("lose");
+      if (trackResult) trackResult({
+        event: "lose",
+        game: "stocks",
+        bet: bet,
+        profit: -bet
+      });
+    }
+  }
+  var graphW = 260,
+    graphH = 90;
+  var hData = history;
+  var hMin = Math.min.apply(null, hData);
+  var hMax = Math.max.apply(null, hData);
+  var hRange = hMax - hMin || 1;
+  var pts = hData.map(function (v, i) {
+    return 5 + i / Math.max(1, hData.length - 1) * (graphW - 10) + "," + (graphH - 5 - (v - hMin) / hRange * (graphH - 10));
+  }).join(" ");
+  var lineColor = holding ? price >= buyPrice ? "var(--green)" : "var(--accent)" : "var(--cool)";
+  var ST_G = [{
+    t: "How It Works",
+    d: "You have 30 seconds. Buy when the price is low, sell when it's high."
+  }, {
+    t: "Profit",
+    d: "Profit = ((sell price - buy price) / 100) × your bet. You pay an entry fee equal to your bet."
+  }, {
+    t: "Tip",
+    d: "Watch the chart for patterns. The price trends slightly upward on average."
+  }];
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "\uD83D\uDCC8 Stock Trader",
+    titleColor: "#00ff88",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, phase === "bet" && /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "var(--dim)",
+      marginBottom: 14,
+      fontSize: 14
+    }
+  }, "Buy low, sell high. 30 seconds on the clock."), /*#__PURE__*/React.createElement(BrokeBanner, {
+    chips: chips,
+    setChips: setChips
+  }), /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: startGame,
+    color: "var(--green)",
+    glow: true
+  }, "Start Trading"))), phase === "play" && /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginBottom: 8,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 800,
+      color: timeLeft <= 5 ? "var(--accent)" : "var(--dim)",
+      fontFamily: "'JetBrains Mono',monospace",
+      animation: timeLeft <= 5 ? "pulse 0.5s infinite" : "none"
+    }
+  }, "⏱ " + timeLeft + "s"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: holding ? "var(--green)" : "var(--dim)",
+      fontFamily: "'JetBrains Mono',monospace",
+      fontWeight: 700,
+      padding: "3px 10px",
+      borderRadius: 6,
+      background: holding ? "rgba(74,222,128,0.1)" : "var(--surface2)",
+      border: "1px solid " + (holding ? "rgba(74,222,128,0.2)" : "var(--border)")
+    }
+  }, holding ? "HOLDING @ $" + buyPrice : "WATCHING")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 42,
+      fontWeight: 900,
+      fontFamily: "'JetBrains Mono',monospace",
+      color: lineColor,
+      marginBottom: 4,
+      transition: "color 0.3s"
+    }
+  }, "$" + price), holding && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: price >= buyPrice ? "var(--green)" : "var(--accent)",
+      marginBottom: 8
+    }
+  }, price >= buyPrice ? "▲ +" : "▼ ", Math.floor((price - buyPrice) / 100 * bet), " chips"), /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 " + graphW + " " + graphH,
+    style: {
+      width: "100%",
+      height: 90,
+      marginBottom: 12,
+      background: "var(--surface2)",
+      borderRadius: 10,
+      border: "1px solid var(--border)"
+    }
+  }, /*#__PURE__*/React.createElement("polyline", {
+    points: pts,
+    fill: "none",
+    stroke: lineColor,
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }), holding && /*#__PURE__*/React.createElement("line", {
+    x1: "0",
+    y1: graphH - 5 - (buyPrice - hMin) / hRange * (graphH - 10),
+    x2: graphW,
+    y2: graphH - 5 - (buyPrice - hMin) / hRange * (graphH - 10),
+    stroke: "#ffd700",
+    strokeWidth: "1",
+    strokeDasharray: "4,4"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, !holding && /*#__PURE__*/React.createElement(Btn, {
+    onClick: buy,
+    color: "var(--green)",
+    glow: true
+  }, "BUY"), holding && /*#__PURE__*/React.createElement(Btn, {
+    onClick: sell,
+    color: "var(--accent)",
+    glow: true
+  }, "SELL"))), phase === "result" && /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, result && /*#__PURE__*/React.createElement(ResultBanner, {
+    text: result.text,
+    type: result.type,
+    show: true
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16,
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: function () {
+      setPhase("bet");
+      setResult(null);
+    },
+    color: "var(--neon)"
+  }, "Trade Again"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: onBack,
+    color: "var(--dim)"
+  }, "Exit"))), /*#__PURE__*/React.createElement(GameGuide, {
+    items: ST_G,
+    title: "Trading Guide"
+  }));
+}
+
+/* ═══ GAME: BOMB DEFUSER ════════════════════════════════════════ */
+function BombDefuser({
+  chips,
+  setChips,
+  onBack,
+  safeMode,
+  setDebtPopup,
+  trackResult
+}) {
+  var [bet, setBet] = useState(10);
+  var [phase, setPhase] = useState("bet");
+  var [wires, setWires] = useState([]);
+  var [cutWires, setCutWires] = useState([]);
+  var [safeWires, setSafeWires] = useState([]);
+  var [result, setResult] = useState(null);
+  var [hint, setHint] = useState(null);
+  var [hintUsed, setHintUsed] = useState(false);
+  var [timeLeft, setTimeLeft] = useState(20);
+  var [exploding, setExploding] = useState(false);
+  var timerRef = useRef(null);
+  var WIRE_COLORS = ["#ef4444", "#3b82f6", "#22c55e", "#eab308", "#a855f7", "#f97316"];
+  var WIRE_NAMES = ["Red", "Blue", "Green", "Yellow", "Purple", "Orange"];
+  var WIRE_COUNT = 6;
+  var BOMB_COUNT = 2;
+  function startGame() {
+    function doIt() {
+      var bombs = [];
+      while (bombs.length < BOMB_COUNT) {
+        var r = Math.floor(Math.random() * WIRE_COUNT);
+        if (bombs.indexOf(r) === -1) bombs.push(r);
+      }
+      var w = [];
+      for (var i = 0; i < WIRE_COUNT; i++) w.push({
+        color: WIRE_COLORS[i],
+        name: WIRE_NAMES[i],
+        bomb: bombs.indexOf(i) >= 0
+      });
+      setWires(w);
+      setCutWires([]);
+      setSafeWires([]);
+      setResult(null);
+      setHint(null);
+      setHintUsed(false);
+      setExploding(false);
+      setTimeLeft(20);
+      setPhase("play");
+      setChips(function (c) {
+        return c - bet;
+      });
+      timerRef.current = setInterval(function () {
+        setTimeLeft(function (t) {
+          if (t <= 1) {
+            clearInterval(timerRef.current);
+            return 0;
+          }
+          return t - 1;
+        });
+      }, 1000);
+    }
+    if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
+    doIt();
+  }
+  useEffect(function () {
+    if (timeLeft === 0 && phase === "play") {
+      clearInterval(timerRef.current);
+      setExploding(true);
+      vib([100, 50, 100, 50, 200]);
+      playSound("lose");
+      setTimeout(function () {
+        setResult({
+          type: "lose",
+          text: "TIME'S UP! Bomb exploded! -" + bet
+        });
+        setPhase("result");
+        if (trackResult) trackResult({
+          event: "lose",
+          game: "bomb",
+          bet: bet,
+          profit: -bet
+        });
+      }, 1500);
+    }
+  }, [timeLeft]);
+  useEffect(function () {
+    return function () {
+      clearInterval(timerRef.current);
+    };
+  }, []);
+  function useHint() {
+    if (hintUsed) return;
+    setHintUsed(true);
+    var uncut = [];
+    for (var i = 0; i < wires.length; i++) {
+      if (cutWires.indexOf(i) === -1) uncut.push(i);
+    }
+    var safeOnes = uncut.filter(function (i) {
+      return !wires[i].bomb;
+    });
+    if (safeOnes.length > 0) {
+      var safe = safeOnes[Math.floor(Math.random() * safeOnes.length)];
+      setHint("💡 The " + wires[safe].name + " wire looks safe...");
+    }
+  }
+  function cutWire(idx) {
+    if (cutWires.indexOf(idx) >= 0 || phase !== "play") return;
+    var wire = wires[idx];
+    var newCut = cutWires.concat([idx]);
+    setCutWires(newCut);
+    if (wire.bomb) {
+      clearInterval(timerRef.current);
+      setExploding(true);
+      vib([100, 50, 100, 50, 200]);
+      playSound("lose");
+      setTimeout(function () {
+        setResult({
+          type: "lose",
+          text: "💥 " + wire.name + " wire was a BOMB! -" + bet
+        });
+        setPhase("result");
+        if (trackResult) trackResult({
+          event: "lose",
+          game: "bomb",
+          bet: bet,
+          profit: -bet
+        });
+      }, 1500);
+    } else {
+      var newSafe = safeWires.concat([idx]);
+      setSafeWires(newSafe);
+      playSound("reveal");
+      vib([20]);
+      var totalSafe = WIRE_COUNT - BOMB_COUNT;
+      if (newSafe.length >= totalSafe) {
+        clearInterval(timerRef.current);
+        var win = Math.floor(bet * 4);
+        setChips(function (c) {
+          return c + win;
+        });
+        setResult({
+          type: "win",
+          text: "🎉 DEFUSED! All safe wires cut! +" + win + " chips!"
+        });
+        setPhase("result");
+        playSound("jackpot");
+        if (trackResult) trackResult({
+          event: "win",
+          game: "bomb",
+          bet: bet,
+          profit: win
+        });
+      }
+    }
+  }
+  function cashOutBomb() {
+    clearInterval(timerRef.current);
+    var multis = [0, 0.5, 1.2, 2.5];
+    var win = Math.floor(bet * (multis[safeWires.length] || 0));
+    setChips(function (c) {
+      return c + win;
+    });
+    playSound("cash");
+    setResult({
+      type: win > 0 ? "win" : "lose",
+      text: "Walked away! " + (win > 0 ? "+" + win : "-" + (bet - win)) + " chips"
+    });
+    setPhase("result");
+    if (trackResult) trackResult({
+      event: win > 0 ? "win" : "lose",
+      game: "bomb",
+      bet: bet,
+      profit: win > 0 ? win : -(bet - win)
+    });
+  }
+  var BD_G = [{
+    t: "6 Wires",
+    d: "2 are connected to the bomb. Cut the 4 safe ones to win!"
+  }, {
+    t: "Timer",
+    d: "You have 20 seconds. If time runs out, the bomb explodes."
+  }, {
+    t: "Hints",
+    d: "Use your free hint to reveal one safe wire. One hint per round."
+  }, {
+    t: "Cash Out",
+    d: "Walk away with partial winnings: 1 wire=0.5x, 2=1.2x, 3=2.5x, All 4=4x."
+  }];
+  return /*#__PURE__*/React.createElement(GameWrap, {
+    title: "\uD83D\uDCA3 Bomb Defuser",
+    titleColor: "#f97316",
+    chips: chips,
+    setChips: setChips,
+    onBack: onBack,
+    safeMode: safeMode
+  }, phase === "bet" && /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "var(--dim)",
+      marginBottom: 14,
+      fontSize: 14
+    }
+  }, "6 wires. 2 are bombs. 20 seconds. Go!"), /*#__PURE__*/React.createElement(BrokeBanner, {
+    chips: chips,
+    setChips: setChips
+  }), /*#__PURE__*/React.createElement(BetSelector, {
+    bet: bet,
+    setBet: setBet,
+    chips: chips
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: startGame,
+    color: "#f97316",
+    glow: true
+  }, "Start Defusing"))), phase === "play" && /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, exploding ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      animation: "popBounce 0.5s"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 80,
+      marginBottom: 8
+    }
+  }, "💥"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 24,
+      fontWeight: 900,
+      color: "#ef4444",
+      fontFamily: "'Playfair Display',serif"
+    }
+  }, "BOOM!")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      fontWeight: 900,
+      color: timeLeft <= 5 ? "#ef4444" : "var(--dim)",
+      fontFamily: "'JetBrains Mono',monospace",
+      animation: timeLeft <= 5 ? "pulse 0.5s infinite" : "none"
+    }
+  }, "💣 " + timeLeft + "s"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--dim)"
+    }
+  }, safeWires.length + "/" + (WIRE_COUNT - BOMB_COUNT) + " safe")), hint && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 14px",
+      background: "rgba(234,179,8,0.1)",
+      borderRadius: 8,
+      border: "1px solid rgba(234,179,8,0.3)",
+      marginBottom: 12,
+      fontSize: 12,
+      color: "#eab308"
+    }
+  }, hint), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+      maxWidth: 280,
+      margin: "0 auto 12px"
+    }
+  }, wires.map(function (w, i) {
+    var isCut = cutWires.indexOf(i) >= 0;
+    var isSafe = safeWires.indexOf(i) >= 0;
+    return /*#__PURE__*/React.createElement("button", {
+      key: i,
+      onClick: function () {
+        cutWire(i);
+      },
+      disabled: isCut,
+      style: {
+        padding: "12px 16px",
+        borderRadius: 10,
+        fontSize: 13,
+        fontWeight: 700,
+        background: isCut ? isSafe ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)" : w.color + "18",
+        border: "2px solid " + (isCut ? isSafe ? "var(--green)" : "#ef4444" : w.color),
+        color: isCut ? isSafe ? "var(--green)" : "#ef4444" : w.color,
+        opacity: isCut ? 0.5 : 1,
+        transition: "all 0.2s",
+        textAlign: "left"
+      }
+    }, "✂️ " + w.name + (isCut ? isSafe ? " — Safe!" : " — 💥 BOMB!" : ""));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, !hintUsed && /*#__PURE__*/React.createElement(Btn, {
+    onClick: useHint,
+    color: "#eab308"
+  }, "\uD83D\uDCA1 Use Hint"), safeWires.length > 0 && safeWires.length < WIRE_COUNT - BOMB_COUNT && /*#__PURE__*/React.createElement(Btn, {
+    onClick: cashOutBomb,
+    color: "var(--neon2)"
+  }, "Cash Out")))), phase === "result" && /*#__PURE__*/React.createElement(Panel, {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 48,
+      marginBottom: 12
+    }
+  }, result && result.type === "win" ? "🎉" : "💥"), result && /*#__PURE__*/React.createElement(ResultBanner, {
+    text: result.text,
+    type: result.type,
+    show: true
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16,
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: function () {
+      setPhase("bet");
+      setResult(null);
+      setExploding(false);
+    },
+    color: "var(--neon)"
+  }, "Play Again"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: onBack,
+    color: "var(--dim)"
+  }, "Exit"))), /*#__PURE__*/React.createElement(GameGuide, {
+    items: BD_G,
+    title: "Defuser Guide"
   }));
 }
 
@@ -11950,6 +12918,33 @@ const GAMES = [{
   tag: "LUCK",
   safe: false,
   safeOnly: false
+}, {
+  id: "roulette",
+  name: "Russian Roulette",
+  icon: "🔫",
+  desc: "6 chambers, 1 bullet",
+  color: "#ef4444",
+  tag: "RISK",
+  safe: false,
+  safeOnly: false
+}, {
+  id: "stocks",
+  name: "Stock Trader",
+  icon: "📈",
+  desc: "Buy low, sell high",
+  color: "#00cc88",
+  tag: "SKILL",
+  safe: false,
+  safeOnly: false
+}, {
+  id: "bomb",
+  name: "Bomb Defuser",
+  icon: "💣",
+  desc: "Cut wires, avoid bombs",
+  color: "#f97316",
+  tag: "RISK",
+  safe: false,
+  safeOnly: false
 }];
 function GameCard({
   game,
@@ -13120,6 +14115,9 @@ function FluxApp() {
     setCollection: setCollection
   })));
   if (game === "scarab") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Scarab, gp));
+  if (game === "roulette") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(RussianRoulette, gp));
+  if (game === "stocks") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(StockTrader, gp));
+  if (game === "bomb") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(BombDefuser, gp));
   return /*#__PURE__*/React.createElement(Wrap, null, splash !== "done" && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -13264,7 +14262,7 @@ function FluxApp() {
       letterSpacing: 0.4,
       fontWeight: 500
     }
-  }, safeMode ? "26 Games · Skill-Based" : "26 Games · Always Shifting"), !safeMode && /*#__PURE__*/React.createElement("div", {
+  }, safeMode ? "29 Games · Skill-Based" : "29 Games · Always Shifting"), !safeMode && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
