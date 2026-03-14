@@ -5,10 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="FluxBucks">
 <meta name="theme-color" content="#050508">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
 <title>FluxBucks</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation}body{min-height:100vh;min-height:100dvh}</style>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -24,7 +21,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.7.0";
+const VERSION = "v4.7.3";
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -169,6 +166,7 @@ var DEFAULT_SAVE = {
   soundOn: true,
   avatar: "👤",
   bgPreset: "stars",
+  autoLevelDismiss: true,
   dailyChallengeCompleted: null,
   achievements: [],
   betHistory: [],
@@ -1117,16 +1115,16 @@ var ACHIEVEMENTS = [{
 }, {
   id: "chicken_5",
   name: "Chicken Dinner",
-  desc: "Reveal 5+ safe tiles in Chicken",
+  desc: "Win a Chicken Race",
   icon: "🐔",
-  hint: "Pick 5 safe tiles without hitting a bone",
+  hint: "Pick the winning chicken",
   tier: "silver"
 }, {
   id: "chicken_12",
   name: "Brave Bird",
-  desc: "Reveal 12+ safe tiles in Chicken",
+  desc: "Win 100+ chips in a single Chicken Race",
   icon: "🦅",
-  hint: "Pick 12 safe tiles in one round",
+  hint: "Win big on a high-odds chicken",
   tier: "gold"
 }, {
   id: "pack_legendary",
@@ -1244,8 +1242,8 @@ function checkAchievements(save, event) {
   if (event.game === "crash" && event.mult >= 50) add("crash_50x");
   if (event.game === "tower" && event.mult >= 30) add("tower_clear");
   if (event.game === "coinflip" && s.currentWinStreak >= 5) add("flip_streak_5");
-  if (event.game === "chicken" && event.revealed >= 5) add("chicken_5");
-  if (event.game === "chicken" && event.revealed >= 12) add("chicken_12");
+  if (event.game === "chicken" && event.event === "win") add("chicken_5");
+  if (event.game === "chicken" && event.profit >= 100) add("chicken_12");
   if (event.game === "packs" && event.rarity === "legendary") add("pack_legendary");
   if (event.game === "scarab" && event.freeSpins) add("scarab_free");
   if (event.game === "scarab" && event.mult >= 20) add("scarab_big");
@@ -3651,10 +3649,12 @@ function Blackjack({
   }), result.reason && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
-      fontSize: 12,
-      color: "var(--dim)",
-      margin: "6px 0",
-      lineHeight: 1.5
+      fontSize: 14,
+      color: "#fff",
+      fontWeight: 800,
+      margin: "8px 0",
+      lineHeight: 1.6,
+      textShadow: "0 1px 3px rgba(0,0,0,0.4)"
     }
   }, result.reason), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -8154,7 +8154,7 @@ function Crash({
     startRef.current = performance.now();
     function tick(now) {
       var elapsed = (now - startRef.current) / 1000;
-      var m = Math.pow(Math.E, elapsed * 0.6);
+      var m = Math.pow(Math.E, elapsed * 0.35);
       if (m >= cp) {
         setMult(parseFloat(cp.toFixed(2)));
         setPhase("crashed");
@@ -8288,7 +8288,7 @@ function Crash({
 /* ═══ GAME: TOWER ════════════════════════════════════════════════ */
 var TW_G = [{
   t: "Climb the Tower",
-  d: "Each floor has 3 doors. One is safe, the others hide traps. Pick the right door to climb higher."
+  d: "Each floor has 3 doors. Two are safe, one hides a trap. Pick a safe door to climb higher."
 }, {
   t: "Multiplier",
   d: "Each safe floor increases your multiplier. The higher you go, the bigger the payout."
@@ -8342,7 +8342,7 @@ function Tower({
   function pickDoor(col) {
     if (phase !== "playing") return;
     if (floor >= FLOORS) return;
-    var isSafe = safes[floor] === col;
+    var isSafe = safes[floor] !== col;
     var newRevealed = revealed.concat([{
       floor: floor,
       col: col,
@@ -8515,17 +8515,22 @@ function Tower({
   }));
 }
 
-/* ═══ GAME: COIN FLIP ════════════════════════════════════════════ */
+/* ═══ GAME: COLOR GUESS ══════════════════════════════════════════ */
 var CF_G = [{
-  t: "Pick a Side",
-  d: "Choose Heads or Tails before the flip. Simple 50/50 odds."
+  t: "Pick a Color",
+  d: "Choose Red, Blue, or Gold. The wheel spins and lands on one."
 }, {
-  t: "Payout",
-  d: "Correct guess pays 1.9x your bet. The 5% edge keeps the house lights on."
+  t: "Payouts",
+  d: "Red & Blue appear often (1.4x). Gold is rare but pays 3.5x."
 }, {
-  t: "Streaks",
-  d: "Past flips don't affect future ones. Each flip is independent."
+  t: "Odds",
+  d: "Red: 40%, Blue: 40%, Gold: 20%. House edge is in the multipliers."
 }];
+var COLOR_WHEEL = [
+  { name: "Red", color: "#ef4444", emoji: "🔴", weight: 0.40, mult: 1.4 },
+  { name: "Blue", color: "#3b82f6", emoji: "🔵", weight: 0.40, mult: 1.4 },
+  { name: "Gold", color: "#fbbf24", emoji: "🟡", weight: 0.20, mult: 3.5 }
+];
 function CoinFlip({
   chips,
   setChips,
@@ -8535,155 +8540,143 @@ function CoinFlip({
   trackResult
 }) {
   var [bet, setBet] = useState(10);
-  var [flipping, setFlipping] = useState(false);
+  var [spinning, setSpinning] = useState(false);
   var [result, setResult] = useState(null);
-  var [coinFace, setCoinFace] = useState(null);
+  var [picked, setPicked] = useState(null);
+  var [landed, setLanded] = useState(null);
+  var [angle, setAngle] = useState(0);
   var [history, setHistory] = useState([]);
-  function flip(choice) {
-    if (flipping) return;
-    function doIt() {
-      doFlip(choice);
-    }
+  function spin() {
+    if (spinning || !picked) return;
+    function doIt() { doSpin(); }
     if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
-    doFlip(choice);
+    doSpin();
   }
-  function doFlip(choice) {
-    setFlipping(true);
+  function doSpin() {
+    setSpinning(true);
     setResult(null);
-    setCoinFace(null);
-    var outcome;
-    if (window.__fluxForceWin) {
-      outcome = choice;
-    } else {
-      outcome = Math.random() < 0.5 ? "heads" : "tails";
+    setLanded(null);
+    /* Pick outcome based on weights */
+    var r = Math.random(), cumul = 0, outcome = COLOR_WHEEL[0];
+    for (var i = 0; i < COLOR_WHEEL.length; i++) {
+      cumul += COLOR_WHEEL[i].weight;
+      if (r < cumul) { outcome = COLOR_WHEEL[i]; break; }
     }
+    /* Calculate spin angle: 3 full rotations + land on the outcome's zone */
+    var zoneAngle = outcome === COLOR_WHEEL[0] ? 60 : outcome === COLOR_WHEEL[1] ? 180 : 300;
+    var jitter = (Math.random() - 0.5) * 80;
+    var totalAngle = angle + 1080 + zoneAngle + jitter;
+    setAngle(totalAngle);
     setTimeout(function () {
-      setCoinFace(outcome);
-      setHistory(function (h) {
-        return [outcome].concat(h).slice(0, 20);
-      });
-      var won = choice === outcome;
+      setLanded(outcome);
+      setHistory(function (h) { return [outcome.name].concat(h).slice(0, 20); });
+      var won = picked === outcome.name;
       if (won) {
-        var profit = Math.floor(bet * 0.9);
-        setChips(function (c) {
-          return c + profit;
-        });
-        setResult({
-          type: "win",
-          text: (outcome === "heads" ? "🪙 Heads" : "⭐ Tails") + "! +" + profit
-        });
-        if (trackResult) trackResult({
-          type: "win",
-          game: "coinflip",
-          bet: bet,
-          profit: profit
-        });
+        var profit = Math.floor(bet * outcome.mult) - bet;
+        setChips(function (c) { return c + profit; });
+        setResult({ type: "win", text: outcome.emoji + " " + outcome.name + "! +" + profit });
+        playSound("jackpot");
+        if (trackResult) trackResult({ type: "win", game: "coinflip", bet: bet, profit: profit });
       } else {
-        setChips(function (c) {
-          return c - bet;
-        });
-        setResult({
-          type: "lose",
-          text: (outcome === "heads" ? "🪙 Heads" : "⭐ Tails") + "! -" + bet
-        });
-        if (trackResult) trackResult({
-          type: "lose",
-          game: "coinflip",
-          bet: bet,
-          profit: -bet
-        });
+        setChips(function (c) { return c - bet; });
+        setResult({ type: "lose", text: outcome.emoji + " " + outcome.name + "! You picked " + picked });
+        playSound("lose");
+        if (trackResult) trackResult({ type: "lose", game: "coinflip", bet: bet, profit: -bet });
       }
-      setFlipping(false);
-    }, 900);
+      setSpinning(false);
+    }, 3200);
   }
+  /* Wheel segments */
+  var segments = [
+    { start: 0, end: 144, color: "#ef4444", label: "Red" },
+    { start: 144, end: 288, color: "#3b82f6", label: "Blue" },
+    { start: 288, end: 360, color: "#fbbf24", label: "Gold" }
+  ];
   return /*#__PURE__*/React.createElement(GameWrap, {
-    title: "🪙 Coin Flip",
+    title: "\uD83C\uDFA8 Color Guess",
     titleColor: "var(--neon2)",
     chips: chips,
     setChips: setChips,
     onBack: onBack,
     safeMode: safeMode
   }, /*#__PURE__*/React.createElement(Panel, {
-    style: {
-      textAlign: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: 120,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 90,
-      height: 90,
-      borderRadius: "50%",
-      background: flipping ? "linear-gradient(135deg,#fbbf24,#c084fc)" : coinFace === "heads" ? "linear-gradient(135deg,#fbbf24,#f59e0b)" : coinFace === "tails" ? "linear-gradient(135deg,#8b5cf6,#6366f1)" : "var(--surface2)",
-      border: "3px solid " + (coinFace === "heads" ? "#fbbf24" : coinFace === "tails" ? "#8b5cf6" : "var(--border)"),
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 36,
-      animation: flipping ? "popBounce 0.9s infinite" : "none",
-      boxShadow: coinFace ? "0 0 24px " + (coinFace === "heads" ? "rgba(251,191,36,0.3)" : "rgba(139,92,246,0.3)") : "none",
-      transition: "all 0.3s"
-    }
-  }, flipping ? "❓" : coinFace === "heads" ? "🪙" : coinFace === "tails" ? "⭐" : "🪙")), result && /*#__PURE__*/React.createElement(ResultBanner, {
-    win: result.type === "win",
-    text: result.text
-  }), history.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 3,
-      justifyContent: "center",
-      marginBottom: 10,
-      flexWrap: "wrap"
-    }
+    style: { textAlign: "center" }
+  },
+  /* Wheel */
+  /*#__PURE__*/React.createElement("div", {
+    style: { position: "relative", width: 180, height: 180, margin: "0 auto 16px" }
+  },
+  /* Pointer */
+  /*#__PURE__*/React.createElement("div", {
+    style: { position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "10px solid transparent", borderRight: "10px solid transparent", borderTop: "14px solid var(--text)", zIndex: 2 }
+  }),
+  /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 200 200",
+    width: 180,
+    height: 180,
+    style: { transform: "rotate(" + angle + "deg)", transition: spinning ? "transform 3s cubic-bezier(0.15, 0.6, 0.25, 1)" : "none" }
+  }, segments.map(function (seg) {
+    var startRad = (seg.start - 90) * Math.PI / 180;
+    var endRad = (seg.end - 90) * Math.PI / 180;
+    var x1 = 100 + 95 * Math.cos(startRad);
+    var y1 = 100 + 95 * Math.sin(startRad);
+    var x2 = 100 + 95 * Math.cos(endRad);
+    var y2 = 100 + 95 * Math.sin(endRad);
+    var large = seg.end - seg.start > 180 ? 1 : 0;
+    return /*#__PURE__*/React.createElement("path", {
+      key: seg.label,
+      d: "M100,100 L" + x1 + "," + y1 + " A95,95 0 " + large + ",1 " + x2 + "," + y2 + " Z",
+      fill: seg.color,
+      stroke: "#000",
+      strokeWidth: 2,
+      opacity: 0.85
+    });
+  }),
+  /*#__PURE__*/React.createElement("circle", { cx: 100, cy: 100, r: 20, fill: "var(--surface)", stroke: "var(--border)", strokeWidth: 2 }),
+  segments.map(function (seg) {
+    var midRad = ((seg.start + seg.end) / 2 - 90) * Math.PI / 180;
+    var tx = 100 + 58 * Math.cos(midRad);
+    var ty = 100 + 58 * Math.sin(midRad);
+    return /*#__PURE__*/React.createElement("text", {
+      key: seg.label + "t", x: tx, y: ty, textAnchor: "middle", dominantBaseline: "central",
+      fill: "#fff", fontSize: 13, fontWeight: 800, fontFamily: "Outfit,sans-serif"
+    }, seg.label);
+  }))),
+  /* Result */
+  result && /*#__PURE__*/React.createElement(ResultBanner, { win: result.type === "win", text: result.text }),
+  /* History */
+  history.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 3, justifyContent: "center", marginBottom: 10, flexWrap: "wrap" }
   }, history.map(function (h, i) {
-    return /*#__PURE__*/React.createElement("span", {
-      key: i,
+    var c = h === "Red" ? "#ef4444" : h === "Blue" ? "#3b82f6" : "#fbbf24";
+    return /*#__PURE__*/React.createElement("div", { key: i, style: { width: 12, height: 12, borderRadius: "50%", background: c, opacity: 1 - i * 0.04 } });
+  })),
+  /* Color pick buttons */
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 8, justifyContent: "center", marginBottom: 12 }
+  }, COLOR_WHEEL.map(function (cw) {
+    var sel = picked === cw.name;
+    return /*#__PURE__*/React.createElement("button", {
+      key: cw.name,
+      onClick: function () { if (!spinning) setPicked(cw.name); },
       style: {
-        fontSize: 14,
-        opacity: 1 - i * 0.04
+        flex: 1, maxWidth: 100, padding: "10px 6px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+        background: sel ? cw.color + "25" : "var(--surface2)",
+        color: sel ? cw.color : "var(--dim)",
+        border: sel ? "2px solid " + cw.color : "1px solid var(--border)",
+        transition: "all 0.2s"
       }
-    }, h === "heads" ? "🪙" : "⭐");
-  })), /*#__PURE__*/React.createElement(BetSelector, {
-    bet: bet,
-    setBet: setBet,
-    chips: chips
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      justifyContent: "center",
-      marginTop: 10
-    }
-  }, /*#__PURE__*/React.createElement(GameBtn, {
-    color: "#fbbf24",
-    text: "\uD83E\uDE99 Heads",
-    onClick: function () {
-      flip("heads");
-    },
-    disabled: flipping
-  }), /*#__PURE__*/React.createElement(GameBtn, {
-    color: "#8b5cf6",
-    text: "\u2B50 Tails",
-    onClick: function () {
-      flip("tails");
-    },
-    disabled: flipping
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 8,
-      fontSize: 11,
-      color: "var(--dim)"
-    }
-  }, "Pays 1.9x on correct guess")), /*#__PURE__*/React.createElement(GameGuide, {
-    items: CF_G,
-    title: "Coin Flip Guide"
-  }));
+    }, cw.emoji + " " + cw.name, /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, marginTop: 2, opacity: 0.7 } }, cw.mult + "x"));
+  })),
+  /*#__PURE__*/React.createElement(BetSelector, { bet: bet, setBet: setBet, chips: chips }),
+  /*#__PURE__*/React.createElement("div", { style: { marginTop: 10 } },
+    /*#__PURE__*/React.createElement(GameBtn, {
+      color: picked === "Red" ? "#ef4444" : picked === "Blue" ? "#3b82f6" : picked === "Gold" ? "#fbbf24" : "var(--dim)",
+      text: spinning ? "Spinning..." : picked ? "Spin! (" + picked + " at " + COLOR_WHEEL.find(function (c) { return c.name === picked; }).mult + "x)" : "Pick a Color",
+      onClick: spin,
+      disabled: spinning || !picked
+    }))),
+  /*#__PURE__*/React.createElement(GameGuide, { items: CF_G, title: "Color Guess Guide" }));
 }
 
 /* ═══ GAME: VIDEO POKER ══════════════════════════════════════════ */
@@ -9229,256 +9222,304 @@ function Baccarat({
 
 /* ═══ GAME: CHICKEN ══════════════════════════════════════════════ */
 var CK_G = [{
-  t: "Pick Tiles",
-  d: "A 5x5 grid hides bones. Each safe tile you reveal increases your multiplier."
+  t: "Pick Your Chicken",
+  d: "4 chickens race. Pick which one you think will win before the race starts."
 }, {
-  t: "Cash Out",
-  d: "Cash out anytime after revealing a tile. The more you reveal, the bigger the payout."
+  t: "Odds & Payouts",
+  d: "Each chicken has different odds. Underdogs pay more but win less often."
 }, {
-  t: "Bones",
-  d: "Hit a bone and lose your bet. Set how many bones (1-12) before starting — more bones = higher multipliers."
+  t: "Watch the Race",
+  d: "Chickens walk, jog, and sprint in bursts — anything can happen! The first to cross the finish line wins."
 }];
+var CHICKEN_NAMES = ["Nugget", "Clucky", "Pecks", "Drumstick"];
+var CHICKEN_COLORS = ["#fbbf24", "#f87171", "#60a5fa", "#4ade80"];
 function Chicken({
   chips,
   setChips,
   onBack,
   safeMode,
   setDebtPopup,
-  trackResult
+  trackResult,
+  stats
 }) {
   var [bet, setBet] = useState(10);
-  var [bones, setBones] = useState(3);
-  var [phase, setPhase] = useState("idle");
-  var [grid, setGrid] = useState([]);
-  var [revealed, setRevealed] = useState([]);
+  var [phase, setPhase] = useState("bet");
+  var [picked, setPicked] = useState(-1);
+  var [positions, setPositions] = useState([0, 0, 0, 0]);
   var [result, setResult] = useState(null);
-  var [activeBet, setActiveBet] = useState(0);
-  var TOTAL = 25;
-  function startGame() {
-    if (phase === "playing") return;
-    function doIt() {
-      doStart();
+  var [winner, setWinner] = useState(-1);
+  var [placements, setPlacements] = useState([]);
+  var [odds, setOdds] = useState([2, 2.5, 3.5, 5]);
+  var [winStreak, setWinStreak] = useState(0);
+  var frameRef = useRef(null);
+  var raceDataRef = useRef(null);
+  var lastTimeRef = useRef(0);
+  function shuffleOdds() {
+    var o = [1.8, 2.5, 3.5, 5.5];
+    for (var i = o.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = o[i]; o[i] = o[j]; o[j] = t; }
+    setOdds(o);
+  }
+  useEffect(function () { shuffleOdds(); }, []);
+  /* Determine finishing order BEFORE the race based on odds + rigging */
+  function determineOrder(pickedIdx, currentOdds) {
+    /* Base win chance is inverse of odds — lower odds = higher chance */
+    var baseChances = currentOdds.map(function (o) { return 1 / o; });
+    var total = baseChances.reduce(function (a, b) { return a + b; }, 0);
+    var normalized = baseChances.map(function (c) { return c / total; });
+    /* Rigging: if player is doing well, reduce their chicken's chance slightly */
+    var rigFactor = 0;
+    if (winStreak >= 3) rigFactor = 0.15;
+    else if (winStreak >= 2) rigFactor = 0.08;
+    if (chips > 5000) rigFactor += 0.05;
+    if (chips > 10000) rigFactor += 0.05;
+    /* On a losing streak, boost their odds a bit to keep them engaged */
+    if (winStreak <= -3) rigFactor = -0.15;
+    else if (winStreak <= -2) rigFactor = -0.08;
+    if (chips < 200) rigFactor -= 0.1;
+    /* Apply rig to picked chicken */
+    if (pickedIdx >= 0) {
+      var shift = normalized[pickedIdx] * rigFactor;
+      normalized[pickedIdx] -= shift;
+      /* Distribute the shifted probability to others */
+      var others = [0,1,2,3].filter(function (i) { return i !== pickedIdx; });
+      others.forEach(function (i) { normalized[i] += shift / others.length; });
+      /* Clamp so nothing goes negative */
+      normalized = normalized.map(function (n) { return Math.max(0.03, n); });
+      var t2 = normalized.reduce(function (a, b) { return a + b; }, 0);
+      normalized = normalized.map(function (n) { return n / t2; });
     }
+    /* Pick finishing order using weighted random */
+    var order = [];
+    var remaining = [0, 1, 2, 3];
+    var probs = normalized.slice();
+    for (var place = 0; place < 4; place++) {
+      var r = Math.random();
+      var cumul = 0;
+      var chosen = remaining[remaining.length - 1];
+      var probTotal = 0;
+      remaining.forEach(function (idx) { probTotal += probs[idx]; });
+      for (var k = 0; k < remaining.length; k++) {
+        cumul += probs[remaining[k]] / probTotal;
+        if (r < cumul) { chosen = remaining[k]; break; }
+      }
+      order.push(chosen);
+      remaining = remaining.filter(function (x) { return x !== chosen; });
+      /* For later positions, remaining chickens compete with equal-ish chances */
+    }
+    return order;
+  }
+  function startRace() {
+    if (picked < 0) return;
+    function doIt() { doStart(); }
     if (checkDebt(bet, chips, setBet, setDebtPopup, doIt)) return;
     doStart();
   }
   function doStart() {
-    var g = Array(TOTAL).fill(false);
-    var placed = 0;
-    while (placed < bones) {
-      var idx = Math.floor(Math.random() * TOTAL);
-      if (!g[idx]) {
-        g[idx] = true;
-        placed++;
-      }
-    }
-    setActiveBet(bet);
-    setChips(function (c) {
-      return c - bet;
-    });
-    setGrid(g);
-    setRevealed([]);
+    setChips(function (c) { return c - bet; });
+    setPositions([0, 0, 0, 0]);
+    setWinner(-1);
     setResult(null);
-    setPhase("playing");
+    setPlacements([]);
+    setPhase("racing");
     playSound("click");
-  }
-  function calcMult(safe) {
-    if (safe === 0) return 1;
-    var m = 1;
-    for (var i = 0; i < safe; i++) {
-      m *= (TOTAL - i) / (TOTAL - bones - i);
-    }
-    return Math.max(1, parseFloat((m * 0.97).toFixed(2)));
-  }
-  function pick(idx) {
-    if (phase !== "playing" || revealed.indexOf(idx) >= 0) return;
-    var newRev = revealed.concat([idx]);
-    setRevealed(newRev);
-    if (grid[idx]) {
-      setPhase("dead");
-      playSound("lose");
-      setResult({
-        type: "lose",
-        text: "🍗 Hit a bone! -" + activeBet
-      });
-      if (trackResult) trackResult({
-        type: "lose",
-        game: "chicken",
-        bet: activeBet,
-        profit: -activeBet,
-        revealed: newRev.length - 1
-      });
-    } else {
-      playSound("reveal");
-      var safeCount = newRev.filter(function (i) {
-        return !grid[i];
-      }).length;
-      if (safeCount >= TOTAL - bones) {
-        var mult = calcMult(safeCount);
-        var payout = Math.floor(activeBet * mult);
-        setPhase("idle");
-        playSound("jackpot");
-        setChips(function (c) {
-          return c + payout;
-        });
-        setResult({
-          type: "win",
-          text: "Cleared all! " + mult + "x = +" + (payout - activeBet)
-        });
-        if (trackResult) trackResult({
-          type: "win",
-          game: "chicken",
-          bet: activeBet,
-          profit: payout - activeBet,
-          revealed: safeCount
-        });
+    /* Determine the finish order before the race starts */
+    var finishOrder = determineOrder(picked, odds);
+    /* Assign target speeds so finishOrder[0] finishes first, etc. */
+    /* Race takes ~8-12 seconds for a nice walking pace */
+    var baseDuration = 8 + Math.random() * 4; /* seconds for 1st place */
+    var targetSpeeds = [0, 0, 0, 0];
+    finishOrder.forEach(function (chickenIdx, place) {
+      /* Each subsequent place finishes 0.5-1.5s later */
+      var delay = place * (0.5 + Math.random() * 1.0);
+      var duration = baseDuration + delay;
+      targetSpeeds[chickenIdx] = 100 / (duration * 60); /* pixels per frame at 60fps */
+    });
+    var pos = [0, 0, 0, 0];
+    var finished = [];
+    var wobble = [0, 0, 0, 0]; /* Walking wobble state */
+    var burstTimers = [0, 0, 0, 0]; /* Burst cooldowns */
+    raceDataRef.current = { finishOrder: finishOrder, targetSpeeds: targetSpeeds };
+    lastTimeRef.current = performance.now();
+    function tick(now) {
+      var dt = Math.min((now - lastTimeRef.current) / 16.67, 3); /* normalize to ~60fps, cap at 3x */
+      lastTimeRef.current = now;
+      for (var i = 0; i < 4; i++) {
+        if (pos[i] >= 100) continue;
+        /* Base walking speed with slight variation */
+        var speed = targetSpeeds[i] * dt;
+        /* Walking rhythm — chickens speed up and slow down naturally */
+        wobble[i] += 0.02 * dt;
+        var rhythm = 0.7 + 0.3 * Math.sin(wobble[i] * 3.5 + i * 1.7);
+        speed *= rhythm;
+        /* Occasional small bursts (like a chicken pecking forward) */
+        burstTimers[i] -= dt;
+        if (burstTimers[i] <= 0 && Math.random() < 0.01 * dt) {
+          speed *= 2.5 + Math.random() * 1.5;
+          burstTimers[i] = 30 + Math.random() * 60; /* cooldown in frames */
+        }
+        /* Occasional pause (chicken stops to look around) */
+        if (Math.random() < 0.005 * dt && pos[i] < 85) {
+          speed *= 0.1;
+        }
+        /* Near the finish, final sprint */
+        if (pos[i] > 80) {
+          speed *= 1.2 + (pos[i] - 80) * 0.03;
+        }
+        /* Drama: if close together near end, tighten the gap */
+        if (pos[i] > 60) {
+          var leader = Math.max.apply(null, pos);
+          var gap = leader - pos[i];
+          if (gap > 0 && gap < 15) {
+            speed *= 1.05 + Math.random() * 0.1;
+          }
+        }
+        pos[i] = Math.min(100, pos[i] + speed);
+        if (pos[i] >= 100 && finished.indexOf(i) === -1) {
+          finished.push(i);
+        }
       }
+      setPositions(pos.slice());
+      if (finished.length >= 4) {
+        setPlacements(finished.slice());
+        var w = finished[0];
+        setWinner(w);
+        setPhase("result");
+        if (w === picked) {
+          var profit = Math.floor(bet * odds[picked]) - bet;
+          setChips(function (c) { return c + profit + bet; });
+          setResult({ type: "win", text: CHICKEN_NAMES[w] + " wins! +" + profit + " chips" });
+          playSound("jackpot");
+          setWinStreak(function (s) { return Math.max(1, s + 1); });
+          if (trackResult) trackResult({ event: "win", game: "chicken", bet: bet, profit: profit });
+        } else {
+          var pickedPlace = finished.indexOf(picked) + 1;
+          var placeText = pickedPlace === 2 ? "2nd" : pickedPlace === 3 ? "3rd" : "4th";
+          setResult({ type: "lose", text: CHICKEN_NAMES[w] + " wins! " + CHICKEN_NAMES[picked] + " came " + placeText + ". -" + bet });
+          playSound("lose");
+          setWinStreak(function (s) { return Math.min(-1, s - 1); });
+          if (trackResult) trackResult({ event: "lose", game: "chicken", bet: bet, profit: -bet });
+        }
+        return;
+      }
+      frameRef.current = requestAnimationFrame(tick);
     }
+    frameRef.current = requestAnimationFrame(tick);
   }
-  function cashOut() {
-    if (phase !== "playing") return;
-    var safeCount = revealed.filter(function (i) {
-      return !grid[i];
-    }).length;
-    if (safeCount === 0) return;
-    var mult = calcMult(safeCount);
-    var payout = Math.floor(activeBet * mult);
-    setPhase("idle");
-    playSound("cash");
-    setChips(function (c) {
-      return c + payout;
-    });
-    setResult({
-      type: "win",
-      text: "Cashed at " + mult + "x! +" + (payout - activeBet)
-    });
-    if (trackResult) trackResult({
-      type: "win",
-      game: "chicken",
-      bet: activeBet,
-      profit: payout - activeBet,
-      revealed: safeCount
-    });
+  useEffect(function () { return function () { if (frameRef.current) cancelAnimationFrame(frameRef.current); }; }, []);
+  function playAgain() {
+    setPicked(-1);
+    setResult(null);
+    setWinner(-1);
+    setPlacements([]);
+    setPositions([0, 0, 0, 0]);
+    setPhase("bet");
+    shuffleOdds();
   }
-  var safeCount = phase === "playing" ? revealed.filter(function (i) {
-    return !grid[i];
-  }).length : 0;
-  var curMult = calcMult(safeCount);
-  var canStart = phase !== "playing";
   return /*#__PURE__*/React.createElement(GameWrap, {
-    title: "🐔 Chicken",
+    title: "\uD83D\uDC14 Chicken Race",
     titleColor: "#fbbf24",
     chips: chips,
     setChips: setChips,
     onBack: onBack,
     safeMode: safeMode
   }, /*#__PURE__*/React.createElement(Panel, {
-    style: {
-      textAlign: "center"
-    }
-  }, phase === "playing" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 22,
-      fontWeight: 900,
-      fontFamily: "'JetBrains Mono',monospace",
-      color: "var(--neon2)",
-      marginBottom: 8
-    }
-  }, curMult.toFixed(2), "x"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "repeat(5, 1fr)",
-      gap: 4,
-      maxWidth: 280,
-      margin: "0 auto 12px"
-    }
-  }, Array.from({
-    length: TOTAL
-  }).map(function (_, i) {
-    var isRevealed = revealed.indexOf(i) >= 0;
-    var isBone = grid[i];
-    var showBone = isRevealed && isBone;
-    var showSafe = isRevealed && !isBone;
-    var showAllBones = phase === "dead";
-    var bg = showSafe ? "rgba(74,222,128,0.25)" : showBone ? "rgba(255,94,120,0.25)" : showAllBones && isBone ? "rgba(255,94,120,0.12)" : "var(--surface2)";
-    var borderC = showSafe ? "var(--green)" : showBone ? "var(--accent)" : "var(--border)";
-    return /*#__PURE__*/React.createElement("button", {
+    style: { textAlign: "center" }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: { color: "var(--dim)", fontSize: 13, marginBottom: 12 }
+  }, phase === "bet" ? "Pick a chicken, place your bet, watch them race!" : phase === "racing" ? "They're off! Go " + (picked >= 0 ? CHICKEN_NAMES[picked] : "") + "!" : ""),
+  /* Race track */
+  /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 14, borderRadius: 12, background: "var(--surface2)", border: "1px solid var(--border)", padding: "12px 10px", position: "relative" }
+  },
+  /* Finish line */
+  /*#__PURE__*/React.createElement("div", {
+    style: { position: "absolute", right: 10, top: 0, bottom: 0, width: 3, background: "var(--accent)", opacity: 0.3, borderRadius: 2 }
+  }),
+  /*#__PURE__*/React.createElement("div", {
+    style: { position: "absolute", right: 6, top: 4, fontSize: 8, color: "var(--dim)", fontWeight: 700, letterSpacing: 1 }
+  }, "FINISH"),
+  [0, 1, 2, 3].map(function (i) {
+    var isWin = winner === i;
+    var isPicked = picked === i;
+    var placeIdx = placements.indexOf(i);
+    var placeLabel = placeIdx === 0 ? "1st" : placeIdx === 1 ? "2nd" : placeIdx === 2 ? "3rd" : placeIdx === 3 ? "4th" : "";
+    return /*#__PURE__*/React.createElement("div", {
       key: i,
-      onClick: function () {
-        pick(i);
-      },
-      disabled: phase !== "playing" || isRevealed,
+      onClick: function () { if (phase === "bet") setPicked(i); },
       style: {
-        width: "100%",
-        aspectRatio: "1",
-        borderRadius: 8,
-        background: bg,
-        border: "2px solid " + borderC,
-        cursor: phase === "playing" && !isRevealed ? "pointer" : "default",
-        fontSize: 18,
         display: "flex",
         alignItems: "center",
-        justifyContent: "center",
-        transition: "all 0.15s"
+        gap: 6,
+        padding: "6px 4px",
+        borderRadius: 8,
+        background: isPicked ? CHICKEN_COLORS[i] + "18" : "transparent",
+        border: isPicked ? "1px solid " + CHICKEN_COLORS[i] + "50" : "1px solid transparent",
+        cursor: phase === "bet" ? "pointer" : "default",
+        marginBottom: i < 3 ? 4 : 0,
+        transition: "all 0.2s"
       }
-    }, showSafe ? "🐔" : showBone ? "🍗" : showAllBones && isBone ? "🍗" : "");
-  })), result && /*#__PURE__*/React.createElement(ResultBanner, {
-    text: result.text,
-    type: result.type
-  }), phase === "playing" && safeCount > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement(GameBtn, {
-    color: "var(--green)",
-    text: "Cash Out " + curMult.toFixed(2) + "x",
-    onClick: cashOut
-  })), canStart && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "var(--dim)",
-      fontWeight: 700
-    }
-  }, "BONES:"), [1, 3, 5, 7, 10].map(function (b) {
-    return /*#__PURE__*/React.createElement("button", {
-      key: b,
-      onClick: function () {
-        setBones(b);
-      },
+    },
+    /* Chicken name + odds */
+    /*#__PURE__*/React.createElement("div", {
+      style: { width: 58, textAlign: "left", flexShrink: 0 }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 10, fontWeight: 800, color: CHICKEN_COLORS[i] }
+    }, CHICKEN_NAMES[i]), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 9, color: "var(--dim)", fontFamily: "'JetBrains Mono',monospace" }
+    }, odds[i].toFixed(1) + "x")),
+    /* Lane */
+    /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, height: 28, background: "var(--bg)", borderRadius: 6, position: "relative", overflow: "hidden", border: "1px solid var(--border)" }
+    },
+    /* Track lines */
+    /*#__PURE__*/React.createElement("div", { style: { position: "absolute", top: "50%", left: 0, right: 0, height: 1, background: "var(--border)", opacity: 0.5 } }),
+    /* Chicken emoji with walking wobble */
+    /*#__PURE__*/React.createElement("div", {
       style: {
-        padding: "4px 10px",
-        borderRadius: 6,
-        fontSize: 12,
-        fontWeight: 700,
-        background: bones === b ? "#fbbf2420" : "var(--surface2)",
-        color: bones === b ? "#fbbf24" : "var(--dim)",
-        border: bones === b ? "2px solid #fbbf24" : "1px solid var(--border)"
+        position: "absolute",
+        left: Math.min(positions[i], 100) * 0.92 + "%",
+        top: "50%",
+        transform: "translateY(-50%)" + (phase === "racing" && positions[i] < 100 ? " rotate(" + (Math.sin(positions[i] * 0.5) * 8) + "deg)" : ""),
+        fontSize: 20,
+        transition: phase === "racing" ? "none" : "left 0.3s",
+        filter: isWin ? "drop-shadow(0 0 6px " + CHICKEN_COLORS[i] + ")" : "none"
       }
-    }, b);
-  })), /*#__PURE__*/React.createElement(BetSelector, {
-    bet: bet,
-    setBet: setBet,
-    chips: chips
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 8
-    }
-  }, /*#__PURE__*/React.createElement(GameBtn, {
-    color: "#fbbf24",
-    text: "\uD83D\uDC14 Start",
-    onClick: startGame
-  })))), /*#__PURE__*/React.createElement(GameGuide, {
-    items: CK_G,
-    title: "Chicken Guide"
-  }));
+    }, "\uD83D\uDC14")),
+    /* Placement label or crown */
+    phase === "result" && placeIdx >= 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: placeIdx === 0 ? 16 : 10,
+        flexShrink: 0,
+        minWidth: 28,
+        textAlign: "center",
+        fontWeight: 800,
+        color: placeIdx === 0 ? "#fbbf24" : placeIdx === 1 ? "#c0c0c0" : placeIdx === 2 ? "#cd7f32" : "var(--dim)",
+        animation: placeIdx === 0 ? "popBounce 0.5s" : "fadeUp 0.3s"
+      }
+    }, placeIdx === 0 ? "\uD83C\uDFC6" : placeLabel));
+  })),
+  /* Result */
+  result && /*#__PURE__*/React.createElement(ResultBanner, { text: result.text, type: result.type, show: true }),
+  /* Controls */
+  phase === "bet" && /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement(BrokeBanner, { chips: chips, setChips: setChips }),
+    /*#__PURE__*/React.createElement(BetSelector, { bet: bet, setBet: setBet, chips: chips }),
+    /*#__PURE__*/React.createElement("div", { style: { marginTop: 10 } },
+      /*#__PURE__*/React.createElement(Btn, {
+        onClick: startRace,
+        color: "#fbbf24",
+        glow: true,
+        disabled: picked < 0
+      }, picked >= 0 ? "Race! (" + CHICKEN_NAMES[picked] + " at " + odds[picked].toFixed(1) + "x)" : "Pick a Chicken First")
+    )
+  ),
+  phase === "result" && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 12, display: "flex", gap: 8, justifyContent: "center" }
+  },
+    /*#__PURE__*/React.createElement(Btn, { onClick: playAgain, color: "var(--neon)" }, "Race Again"),
+    /*#__PURE__*/React.createElement(Btn, { onClick: onBack, color: "var(--dim)" }, "Exit")
+  )),
+  /*#__PURE__*/React.createElement(GameGuide, { items: CK_G, title: "Chicken Race Guide" }));
 }
 
 /* ═══ GAME: PACKS / LOOTBOXES ═══════════════════════════════════ */
@@ -9638,44 +9679,36 @@ function Packs({
     /* Wait for DOM to render the reel at position 0, then animate */
     setTimeout(function () {
       var containerW = containerRef.current ? containerRef.current.offsetWidth : 300;
-      var targetX = reel.winPos * ITEM_TOTAL - containerW / 2 + ITEM_W / 2;
+      var targetX = reel.winPos * ITEM_TOTAL + ITEM_W / 2;
       setReelOffset(-targetX);
-    }, 60);
-    setTimeout(function () {
-      setFinalItem(item);
-      setPhase("reveal");
-      playSound(item.rarity === "legendary" || item.rarity === "epic" ? "jackpot" : "reveal");
-      var isDupe = collection.indexOf(item.name) >= 0;
-      var profit;
-      if (isDupe) {
-        var bonus = RARITY_CHIPS[item.rarity] || 5;
-        setChips(function (c) {
-          return c + bonus;
-        });
-        profit = bonus - COST;
-        setResult({
-          type: profit >= 0 ? "win" : "lose",
-          text: "Duplicate! +" + bonus + " chips"
-        });
-      } else {
-        setCollection(function (c) {
-          return c.concat([item.name]);
-        });
-        profit = -COST;
-        setResult({
-          type: "win",
-          text: "New: " + item.name + "!"
-        });
+      /* Wait for CSS transition to finish before revealing */
+      function onEnd() {
+        if (stripRef.current) stripRef.current.removeEventListener("transitionend", onEnd);
+        setFinalItem(item);
+        setPhase("reveal");
+        playSound(item.rarity === "legendary" || item.rarity === "epic" ? "jackpot" : "reveal");
+        var isDupe = collection.indexOf(item.name) >= 0;
+        var profit;
+        if (isDupe) {
+          var bonus = RARITY_CHIPS[item.rarity] || 5;
+          setChips(function (c) { return c + bonus; });
+          profit = bonus - COST;
+          setResult({ type: profit >= 0 ? "win" : "lose", text: "Duplicate! +" + bonus + " chips" });
+        } else {
+          setCollection(function (c) { return c.concat([item.name]); });
+          profit = -COST;
+          setResult({ type: "win", text: "New: " + item.name + "!" });
+        }
+        if (trackResult) trackResult({ event: profit >= 0 ? "win" : "lose", game: "packs", bet: COST, profit: profit, rarity: item.rarity, collectionSize: collection.length + (isDupe ? 0 : 1) });
       }
-      if (trackResult) trackResult({
-        event: profit >= 0 ? "win" : "lose",
-        game: "packs",
-        bet: COST,
-        profit: profit,
-        rarity: item.rarity,
-        collectionSize: collection.length + (isDupe ? 0 : 1)
-      });
-    }, 5200);
+      if (stripRef.current) {
+        stripRef.current.addEventListener("transitionend", onEnd, { once: true });
+      }
+      /* Fallback in case transitionend doesn't fire */
+      setTimeout(function () {
+        if (phase === "rolling") onEnd();
+      }, 5800);
+    }, 60);
   }
   return /*#__PURE__*/React.createElement(GameWrap, {
     title: "📦 Packs",
@@ -9753,7 +9786,8 @@ function Packs({
     return /*#__PURE__*/React.createElement("div", {
       key: i,
       style: {
-        minWidth: ITEM_W,
+        width: ITEM_W,
+        maxWidth: ITEM_W,
         height: 88,
         borderRadius: 10,
         background: isWinner ? RARITY_COLORS[item.rarity] + "30" : RARITY_COLORS[item.rarity] + "12",
@@ -9763,6 +9797,8 @@ function Packs({
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
+        flexGrow: 0,
+        overflow: "hidden",
         boxShadow: isWinner ? "0 0 20px " + RARITY_COLORS[item.rarity] + "40" : "none",
         transition: "all 0.3s"
       }
@@ -9879,7 +9915,7 @@ function RussianRoulette({
   };
   function startGame() {
     function doIt() {
-      setBulletPos(Math.floor(Math.random() * chambers));
+      setBulletPos(1 + Math.floor(Math.random() * (chambers - 1)));
       setChamber(0);
       setResult(null);
       setPullState(null);
@@ -10120,10 +10156,43 @@ function RussianRoulette({
     }
   }, "*click* \u2014 Empty!")), !pullState && /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 48,
-      marginBottom: 12
+      marginBottom: 12,
+      display: "flex",
+      justifyContent: "center"
     }
-  }, "🔫"), result && /*#__PURE__*/React.createElement(ResultBanner, {
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 120 80",
+    width: 96,
+    height: 64,
+    style: { filter: "drop-shadow(0 0 8px rgba(239,68,68,0.3))" }
+  }, /*#__PURE__*/React.createElement("g", {
+    fill: "none",
+    stroke: "var(--text)",
+    strokeWidth: 3.5,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  },
+  /* barrel */
+  /*#__PURE__*/React.createElement("rect", { x: 28, y: 22, width: 60, height: 16, rx: 3 }),
+  /* muzzle */
+  /*#__PURE__*/React.createElement("line", { x1: 88, y1: 26, x2: 95, y2: 26 }),
+  /*#__PURE__*/React.createElement("line", { x1: 88, y1: 34, x2: 95, y2: 34 }),
+  /* cylinder (revolver drum) */
+  /*#__PURE__*/React.createElement("circle", { cx: 36, cy: 30, r: 12, stroke: "#ef4444", strokeWidth: 2.5 }),
+  /*#__PURE__*/React.createElement("circle", { cx: 36, cy: 30, r: 4, fill: "#ef4444", stroke: "none" }),
+  /* trigger guard */
+  /*#__PURE__*/React.createElement("path", { d: "M40 38 Q40 56 52 56 Q60 56 60 48" }),
+  /* trigger */
+  /*#__PURE__*/React.createElement("line", { x1: 48, y1: 40, x2: 50, y2: 50 }),
+  /* grip */
+  /*#__PURE__*/React.createElement("path", { d: "M28 38 L22 62 Q22 66 26 66 L38 66 Q42 66 40 62 L40 38" }),
+  /* grip texture lines */
+  /*#__PURE__*/React.createElement("line", { x1: 27, y1: 48, x2: 37, y2: 48, strokeWidth: 1.5, opacity: 0.4 }),
+  /*#__PURE__*/React.createElement("line", { x1: 26, y1: 54, x2: 38, y2: 54, strokeWidth: 1.5, opacity: 0.4 }),
+  /*#__PURE__*/React.createElement("line", { x1: 25, y1: 60, x2: 39, y2: 60, strokeWidth: 1.5, opacity: 0.4 }),
+  /* hammer */
+  /*#__PURE__*/React.createElement("path", { d: "M28 22 L24 14 Q26 10 30 12 L32 18" })
+  ))), result && /*#__PURE__*/React.createElement(ResultBanner, {
     text: result.text,
     type: result.type,
     show: true
@@ -11568,7 +11637,7 @@ function ShareCard({
 }
 
 /* ═══ DEVELOPER NEWS ═════════════════════════════════════════════ */
-function DevNews() {
+function DevNews({ onSettings }) {
   var [messages, setMessages] = useState([]);
   var [currentIdx, setCurrentIdx] = useState(0);
   useEffect(function () {
@@ -11682,7 +11751,15 @@ function DevNews() {
       color: "var(--text)",
       marginBottom: 10
     }
-  }, news.title || "Developer Update"), /*#__PURE__*/React.createElement("p", {
+  }, news.title || "Developer Update"), news.date && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--dim)",
+      fontFamily: "'JetBrains Mono',monospace",
+      marginBottom: 8,
+      opacity: 0.7
+    }
+  }, "Posted: " + news.date), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 13,
       color: "var(--dim)",
@@ -11723,7 +11800,18 @@ function DevNews() {
       color: "var(--dim)",
       border: "1px solid var(--border)"
     }
-  }, currentIdx < messages.length - 1 ? "Next (" + (messages.length - currentIdx - 1) + " more)" : "Got it"))));
+  }, currentIdx < messages.length - 1 ? "Next (" + (messages.length - currentIdx - 1) + " more)" : "Got it"), onSettings && /*#__PURE__*/React.createElement("button", {
+    onClick: function () { setMessages([]); onSettings(); },
+    style: {
+      padding: "8px 18px",
+      borderRadius: 8,
+      fontSize: 12,
+      fontWeight: 600,
+      background: "var(--surface2)",
+      color: "var(--neon)",
+      border: "1px solid var(--border)"
+    }
+  }, "⚙️ Settings"))));
 }
 
 /* ═══ UPDATE BANNER ══════════════════════════════════════════════ */
@@ -12866,11 +12954,11 @@ const GAMES = [{
   safeOnly: false
 }, {
   id: "coinflip",
-  name: "Coin Flip",
-  icon: "🪙",
-  desc: "Heads or tails, 1.9x",
+  name: "Color Guess",
+  icon: "🎨",
+  desc: "Pick a color, spin the wheel",
   color: "var(--neon2)",
-  tag: "INSTANT",
+  tag: "SPIN",
   safe: false,
   safeOnly: false
 }, {
@@ -12893,11 +12981,11 @@ const GAMES = [{
   safeOnly: false
 }, {
   id: "chicken",
-  name: "Chicken",
+  name: "Chicken Race",
   icon: "🐔",
-  desc: "Reveal tiles, avoid bones",
+  desc: "Bet on racing chickens",
   color: "#fbbf24",
-  tag: "RISK",
+  tag: "RACE",
   safe: false,
   safeOnly: false
 }, {
@@ -12957,20 +13045,46 @@ function GameCard({
   const isLadder = game.id === "ladder";
   const hoverTransform = isLadder ? "translateY(-3px) rotate(1.5deg)" : "translateY(-5px) scale(1.03)";
   const animStr = quickPlay ? "none" : "staggerPop 0.7s cubic-bezier(0.34,1.56,0.64,1) " + animDelay + "ms both";
+  const isTouchDevice = useRef(false);
+  const lastMousePos = useRef({ x: 0, y: 0, t: 0 });
+  const hoverTimer = useRef(null);
   function handleClick(e) {
-    try {
-      playSound("tap");
-    } catch (ex) {}
+    try { playSound("tap"); } catch (ex) {}
     onClick();
+  }
+  function onPointerEnter(e) {
+    /* Skip hover entirely on touch devices */
+    if (e.pointerType === "touch" || e.pointerType === "pen") { isTouchDevice.current = true; return; }
+    if (isTouchDevice.current) return;
+    /* Check mouse velocity — only hover if moving slowly */
+    var now = Date.now();
+    var dx = e.clientX - lastMousePos.current.x;
+    var dy = e.clientY - lastMousePos.current.y;
+    var dt = now - lastMousePos.current.t;
+    var speed = dt > 0 ? Math.sqrt(dx * dx + dy * dy) / dt : 0;
+    lastMousePos.current = { x: e.clientX, y: e.clientY, t: now };
+    /* If mouse is moving fast (speed > 1.5 px/ms), delay the hover */
+    if (speed > 1.5) {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+      hoverTimer.current = setTimeout(function () { setH(true); }, 120);
+    } else {
+      setH(true);
+    }
+  }
+  function onPointerLeave() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setH(false);
+  }
+  function onPointerMove(e) {
+    if (e.pointerType === "touch" || e.pointerType === "pen") return;
+    lastMousePos.current = { x: e.clientX, y: e.clientY, t: Date.now() };
   }
   return /*#__PURE__*/React.createElement("div", {
     onClick: handleClick,
-    onMouseEnter: function () {
-      setH(true);
-    },
-    onMouseLeave: function () {
-      setH(false);
-    },
+    onPointerEnter: onPointerEnter,
+    onPointerLeave: onPointerLeave,
+    onPointerMove: onPointerMove,
+    onTouchStart: function () { isTouchDevice.current = true; setH(false); },
     style: {
       background: h ? "var(--surface2)" : "var(--surface)",
       border: h ? "2px solid " + game.color : "2px solid var(--border)",
@@ -13216,7 +13330,8 @@ function LevelUpOverlay({
   level,
   title,
   titleColor,
-  onDone
+  onDone,
+  autoDismiss
 }) {
   var [phase, setPhase] = useState("burst");
   useEffect(function () {
@@ -13226,16 +13341,19 @@ function LevelUpOverlay({
     var t1 = setTimeout(function () {
       setPhase("show");
     }, 400);
-    var t2 = setTimeout(function () {
-      setPhase("fade");
-    }, 3200);
-    var t3 = setTimeout(function () {
-      onDone();
-    }, 3800);
+    var t2, t3;
+    if (autoDismiss !== false) {
+      t2 = setTimeout(function () {
+        setPhase("fade");
+      }, 3200);
+      t3 = setTimeout(function () {
+        onDone();
+      }, 3800);
+    }
     return function () {
       clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
+      if (t2) clearTimeout(t2);
+      if (t3) clearTimeout(t3);
     };
   }, []);
   return /*#__PURE__*/React.createElement("div", {
@@ -13439,19 +13557,8 @@ function AFKPopup({
 }) {
   var [countdown, setCountdown] = useState(120);
   useEffect(function () {
-    var iv = setInterval(function () {
-      setCountdown(function (c) {
-        if (c <= 1) {
-          clearInterval(iv);
-          onTimeout();
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return function () {
-      clearInterval(iv);
-    };
+    /* No auto-timeout - just wait for user to tap */
+    return function () {};
   }, []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -13505,7 +13612,7 @@ function AFKPopup({
       color: "var(--dim)",
       marginBottom: 20
     }
-  }, "Session timer paused. Resuming in ", countdown, "s or tap below."), /*#__PURE__*/React.createElement("button", {
+  }, "Session timer paused. Tap below to continue."), /*#__PURE__*/React.createElement("button", {
     onClick: onYes,
     style: {
       padding: "12px 32px",
@@ -13563,6 +13670,7 @@ function FluxApp() {
   const [soundOn, setSoundOn] = useState(save.soundOn !== false);
   const [avatar, setAvatar] = useState(save.avatar || "👤");
   const [bgPreset, setBgPreset] = useState(save.bgPreset || "stars");
+  const [autoLevelDismiss, setAutoLevelDismiss] = useState(save.autoLevelDismiss !== false);
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [showBgRequest, setShowBgRequest] = useState(false);
   const [clickParticles, setClickParticles] = useState([]);
@@ -13632,6 +13740,7 @@ function FluxApp() {
       soundOn: soundOn,
       avatar: avatar,
       bgPreset: bgPreset,
+      autoLevelDismiss: autoLevelDismiss,
       dailyChallengeCompleted: dailyChallengeCompleted,
       achievements: achievements,
       betHistory: betHistory.slice(-50),
@@ -13645,7 +13754,7 @@ function FluxApp() {
       longestSession: longestSession
     };
     writeSave(saveData);
-  }, [chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession]);
+  }, [chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession]);
 
   // Track game results for achievements/stats/history
   function trackResult(event) {
@@ -13703,20 +13812,21 @@ function FluxApp() {
       }, 2000);
     }
     /* Daily challenge tracking */
+    var evType = event.event || event.type || "";
     if (dailyChallenge && dailyChallengeCompleted !== getTodayDateStr() && event.game === dailyChallenge.game.id) {
       var newProgress = dailyChallengeProgress;
       var completed = false;
-      if (dailyChallenge.type === "win" && event.event === "win") {
+      if (dailyChallenge.type === "win" && evType === "win") {
         newProgress = dailyChallengeProgress + 1;
         if (newProgress >= dailyChallenge.count) completed = true;
-      } else if (dailyChallenge.type === "profit" && event.event === "win" && event.profit >= dailyChallenge.amount) {
+      } else if (dailyChallenge.type === "profit" && evType === "win" && event.profit >= dailyChallenge.amount) {
         completed = true;
         newProgress = 1;
       } else if (dailyChallenge.type === "play") {
         newProgress = dailyChallengeProgress + 1;
         if (newProgress >= dailyChallenge.count) completed = true;
       } else if (dailyChallenge.type === "winstreak") {
-        if (event.event === "win") {
+        if (evType === "win") {
           newProgress = dailyChallengeProgress + 1;
           if (newProgress >= dailyChallenge.count) completed = true;
         } else {
@@ -13724,16 +13834,16 @@ function FluxApp() {
         }
       } else if (dailyChallenge.type === "comeback") {
         /* Track: 0=waiting, 1=lost (ready for comeback), 2=done */
-        if (event.event === "lose" && newProgress === 0) {
+        if (evType === "lose" && newProgress === 0) {
           newProgress = 1;
-        } else if (event.event === "win" && newProgress === 1) {
+        } else if (evType === "win" && newProgress === 1) {
           completed = true;
           newProgress = 2;
         }
       } else if (dailyChallenge.type === "noloss") {
-        if (event.event === "lose") {
+        if (evType === "lose") {
           newProgress = 0;
-        } else if (event.event === "win") {
+        } else if (evType === "win") {
           newProgress = dailyChallengeProgress + 1;
           if (newProgress >= dailyChallenge.count) completed = true;
         }
@@ -13891,6 +14001,15 @@ function FluxApp() {
     var bs = BG_STYLES[bgPreset] || BG_STYLES["stars"];
     document.body.style.background = bs.bg;
   }, [bgPreset]);
+  /* Browser back button support */
+  useEffect(function () {
+    function handlePop() { setGame(null); setShowSettings(false); setShowProfile(false); setShowStats(false); setShowAchievements(false); setShowInfo(false); setShowHelp(false); setShowChangelog(false); }
+    window.addEventListener("popstate", handlePop);
+    return function () { window.removeEventListener("popstate", handlePop); };
+  }, []);
+  useEffect(function () {
+    if (game) { window.history.pushState({ game: game }, ""); }
+  }, [game]);
   useEffect(function () {
     setBalanceHistory(function (h) {
       var last = h.length > 0 ? h[h.length - 1] : null;
@@ -14456,9 +14575,10 @@ function FluxApp() {
       boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
       fontFamily: "'JetBrains Mono',monospace",
       fontWeight: 700,
-      opacity: 0.7
+      opacity: 1,
+      fontSize: 13
     }
-  }, avatar + " " + username + " · Lv." + getLevelInfo(xp).level), showProfile && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 20, lineHeight: 1, verticalAlign: "middle" } }, avatar), " ", username + " · Lv." + getLevelInfo(xp).level), showProfile && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
@@ -15077,7 +15197,17 @@ function FluxApp() {
       transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)",
       boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
     }
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))),
+  /* Auto-dismiss level up */
+  /*#__PURE__*/React.createElement("div", {
+    style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\u2B06\uFE0F"),
+    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Auto-Dismiss Level Up")),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Closes level-up screen after 3s instead of waiting for a tap.")),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setAutoLevelDismiss(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: autoLevelDismiss ? "var(--green)" : "var(--surface)", border: autoLevelDismiss ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+    /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: autoLevelDismiss ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+  /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "14px 16px",
       background: "var(--surface2)",
@@ -15941,12 +16071,13 @@ function FluxApp() {
     level: levelUpData.level,
     title: levelUpData.title,
     titleColor: levelUpData.titleColor,
+    autoDismiss: autoLevelDismiss,
     onDone: function () {
       setLevelUpData(null);
     }
   }), /*#__PURE__*/React.createElement(UpdateBanner, {
     currentVersion: VERSION
-  }), /*#__PURE__*/React.createElement(DevNews, null));
+  }), /*#__PURE__*/React.createElement(DevNews, { onSettings: function () { setShowSettings(true); } }));
 }
 var BG_STYLES = {
   "stars": {
@@ -16038,9 +16169,8 @@ function Wrap({
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(function(e) { console.log('SW registration failed:', e); });
-}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
 </script>
-</body>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js").catch(function(){});}</script></body>
 </html>
