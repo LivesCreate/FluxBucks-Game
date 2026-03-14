@@ -21,7 +21,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.7.3";
+const VERSION = "v4.7.4";
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -106,6 +106,7 @@ const CSS = `
 :root{--bg:#050508;--surface:rgba(14,14,28,0.85);--surface2:rgba(22,22,42,0.65);--border:rgba(255,255,255,0.06);--neon:#c084fc;--neon2:#818cf8;--accent:#ff5e78;--cool:#56c1ff;--green:#4ade80;--text:#e0e0e8;--dim:#6b6b80;--card:#fdfaf5}
 *{box-sizing:border-box;margin:0;padding:0}
 @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes lossSlideIn{0%{transform:translateX(120%);opacity:0}15%{transform:translateX(0);opacity:1}85%{transform:translateX(0);opacity:1}100%{transform:translateX(120%);opacity:0}}
 @keyframes fadeDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
 @keyframes popIn{0%{opacity:0;transform:scale(0.6)}70%{transform:scale(1.08)}100%{opacity:1;transform:scale(1)}}
 @keyframes popBounce{0%{transform:scale(0.5)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
@@ -167,6 +168,7 @@ var DEFAULT_SAVE = {
   avatar: "👤",
   bgPreset: "stars",
   autoLevelDismiss: true,
+  rouletteGoreSkull: false,
   dailyChallengeCompleted: null,
   achievements: [],
   betHistory: [],
@@ -3670,7 +3672,14 @@ function Blackjack({
       setResult(null);
     },
     color: "var(--neon)"
-  }, "Play Again"), /*#__PURE__*/React.createElement(Btn, {
+  }, "Play Again"), chips >= bet && /*#__PURE__*/React.createElement(Btn, {
+    onClick: function () {
+      setResult(null);
+      setDReveal(false);
+      dealCards();
+    },
+    color: "var(--neon2)"
+  }, "\u26A1 Replay " + bet), /*#__PURE__*/React.createElement(Btn, {
     onClick: onBack,
     color: "var(--dim)"
   }, "Exit")))), /*#__PURE__*/React.createElement(GameGuide, {
@@ -5363,6 +5372,7 @@ function Dice({
   var [rolling, setRolling] = useState(false);
   var [rollNum, setRollNum] = useState(null);
   var [animNum, setAnimNum] = useState(null);
+  var [rollHistory, setRollHistory] = useState([]);
   var HOUSE = 1;
   function wc() {
     return mode === "over" ? 100 - target : target;
@@ -5391,6 +5401,7 @@ function Dice({
     setRollNum(outcome);
     await delay(300);
     var win = mode === "over" ? outcome > target : outcome < target;
+    setRollHistory(function (h) { return [{ win: win, roll: outcome }].concat(h).slice(0, 50); });
     var p = prof();
     if (win) {
       setChips(function (c) {
@@ -5613,7 +5624,11 @@ function Dice({
     label: "PROFIT",
     value: "+" + cp,
     color: "var(--cool)"
-  })), /*#__PURE__*/React.createElement(ResultBanner, {
+  })), rollHistory.length >= 3 && /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 10, color: "var(--dim)", marginBottom: 6, fontFamily: "'JetBrains Mono',monospace" }
+  }, "Observed: ", /*#__PURE__*/React.createElement("span", {
+    style: { color: (rollHistory.filter(function (r) { return r.win; }).length / rollHistory.length * 100) >= cw - 5 ? "var(--green)" : "var(--accent)", fontWeight: 700 }
+  }, (rollHistory.filter(function (r) { return r.win; }).length / rollHistory.length * 100).toFixed(1) + "% wins"), " over " + rollHistory.length + " rolls"), /*#__PURE__*/React.createElement(ResultBanner, {
     text: result ? result.text : "",
     type: result ? result.type : "lose",
     show: !!result && !rolling
@@ -9517,6 +9532,7 @@ function Chicken({
     style: { marginTop: 12, display: "flex", gap: 8, justifyContent: "center" }
   },
     /*#__PURE__*/React.createElement(Btn, { onClick: playAgain, color: "var(--neon)" }, "Race Again"),
+    picked >= 0 && chips >= bet && /*#__PURE__*/React.createElement(Btn, { onClick: function () { setResult(null); setWinner(-1); setPlacements([]); setPositions([0,0,0,0]); shuffleOdds(); startRace(); }, color: "var(--neon2)" }, "\u26A1 Replay " + bet),
     /*#__PURE__*/React.createElement(Btn, { onClick: onBack, color: "var(--dim)" }, "Exit")
   )),
   /*#__PURE__*/React.createElement(GameGuide, { items: CK_G, title: "Chicken Race Guide" }));
@@ -9899,7 +9915,8 @@ function RussianRoulette({
   onBack,
   safeMode,
   setDebtPopup,
-  trackResult
+  trackResult,
+  goreSkull
 }) {
   var [bet, setBet] = useState(10);
   var [chambers, setChambers] = useState(6);
@@ -10119,9 +10136,23 @@ function RussianRoulette({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 72,
-      animation: "popBounce 0.5s"
+      animation: "popBounce 0.5s",
+      lineHeight: 1
     }
-  }, "💀"), /*#__PURE__*/React.createElement("div", {
+  }, goreSkull ? /*#__PURE__*/React.createElement("svg", { viewBox: "0 0 100 100", width: 80, height: 80, style: { filter: "drop-shadow(0 0 12px rgba(239,68,68,0.5))" } },
+    /*#__PURE__*/React.createElement("circle", { cx: 50, cy: 42, r: 32, fill: "#e8e0d4", stroke: "var(--text)", strokeWidth: 2 }),
+    /*#__PURE__*/React.createElement("ellipse", { cx: 38, cy: 38, rx: 8, ry: 10, fill: "#1a1a2e" }),
+    /*#__PURE__*/React.createElement("ellipse", { cx: 62, cy: 38, rx: 8, ry: 10, fill: "#1a1a2e" }),
+    /*#__PURE__*/React.createElement("ellipse", { cx: 50, cy: 52, rx: 4, ry: 3, fill: "#1a1a2e" }),
+    /*#__PURE__*/React.createElement("path", { d: "M38 62 L42 68 L46 62 L50 68 L54 62 L58 68 L62 62", fill: "none", stroke: "#1a1a2e", strokeWidth: 2 }),
+    /*#__PURE__*/React.createElement("circle", { cx: 68, cy: 32, r: 5, fill: "#1a1a2e", stroke: "#555", strokeWidth: 1 }),
+    /*#__PURE__*/React.createElement("line", { x1: 72, y1: 28, x2: 78, y2: 22, stroke: "#555", strokeWidth: 1 }),
+    /*#__PURE__*/React.createElement("line", { x1: 64, y1: 28, x2: 60, y2: 22, stroke: "#555", strokeWidth: 1 }),
+    /*#__PURE__*/React.createElement("path", { d: "M70 35 Q80 40 78 55 Q76 65 68 60", fill: "#dc2626", stroke: "none", opacity: 0.8 }),
+    /*#__PURE__*/React.createElement("path", { d: "M72 45 Q82 55 75 70", fill: "none", stroke: "#dc2626", strokeWidth: 2, opacity: 0.6 }),
+    /*#__PURE__*/React.createElement("circle", { cx: 76, cy: 62, r: 3, fill: "#dc2626", opacity: 0.5 }),
+    /*#__PURE__*/React.createElement("circle", { cx: 72, cy: 68, r: 2, fill: "#dc2626", opacity: 0.4 })
+  ) : "\uD83D\uDC80"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 28,
       fontWeight: 900,
@@ -10233,7 +10264,14 @@ function RussianRoulette({
       setPullState(null);
     },
     color: "var(--neon)"
-  }, "Play Again"), /*#__PURE__*/React.createElement(Btn, {
+  }, "Play Again"), chips >= bet && /*#__PURE__*/React.createElement(Btn, {
+    onClick: function () {
+      setResult(null);
+      setPullState(null);
+      startGame();
+    },
+    color: "var(--neon2)"
+  }, "\u26A1 Replay " + bet), /*#__PURE__*/React.createElement(Btn, {
     onClick: onBack,
     color: "var(--dim)"
   }, "Exit"))), /*#__PURE__*/React.createElement(GameGuide, {
@@ -10879,7 +10917,14 @@ function BombDefuser({
       setExploding(false);
     },
     color: "var(--neon)"
-  }, "Play Again"), /*#__PURE__*/React.createElement(Btn, {
+  }, "Play Again"), chips >= bet && /*#__PURE__*/React.createElement(Btn, {
+    onClick: function () {
+      setResult(null);
+      setExploding(false);
+      startGame();
+    },
+    color: "var(--neon2)"
+  }, "\u26A1 Replay " + bet), /*#__PURE__*/React.createElement(Btn, {
     onClick: onBack,
     color: "var(--dim)"
   }, "Exit"))), /*#__PURE__*/React.createElement(GameGuide, {
@@ -13671,9 +13716,12 @@ function FluxApp() {
   const [avatar, setAvatar] = useState(save.avatar || "👤");
   const [bgPreset, setBgPreset] = useState(save.bgPreset || "stars");
   const [autoLevelDismiss, setAutoLevelDismiss] = useState(save.autoLevelDismiss !== false);
+  const [rouletteGoreSkull, setRouletteGoreSkull] = useState(save.rouletteGoreSkull || false);
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [showBgRequest, setShowBgRequest] = useState(false);
   const [clickParticles, setClickParticles] = useState([]);
+  const [lossToast, setLossToast] = useState(null);
+  const lossToastTimer = useRef(null);
   const [balanceHistory, setBalanceHistory] = useState(save.balanceHistory || []);
   const [collection, setCollection] = useState(save.collection || []);
   const [showShareCard, setShowShareCard] = useState(false);
@@ -13741,6 +13789,7 @@ function FluxApp() {
       avatar: avatar,
       bgPreset: bgPreset,
       autoLevelDismiss: autoLevelDismiss,
+      rouletteGoreSkull: rouletteGoreSkull,
       dailyChallengeCompleted: dailyChallengeCompleted,
       achievements: achievements,
       betHistory: betHistory.slice(-50),
@@ -13754,14 +13803,21 @@ function FluxApp() {
       longestSession: longestSession
     };
     writeSave(saveData);
-  }, [chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession]);
+  }, [chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, rouletteGoreSkull, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession]);
 
   // Track game results for achievements/stats/history
   function trackResult(event) {
     try {
-      if (navigator.vibrate) navigator.vibrate(event.type === "win" ? [50, 30, 50] : [80]);
+      if (navigator.vibrate) navigator.vibrate(event.type === "win" || event.event === "win" ? [50, 30, 50] : [80]);
     } catch (e) {}
     lastActivityRef.current = Date.now();
+    /* Loss toast */
+    var evT = event.event || event.type || "";
+    if (evT === "lose" && event.bet) {
+      if (lossToastTimer.current) clearTimeout(lossToastTimer.current);
+      setLossToast({ amount: event.bet, game: event.game });
+      lossToastTimer.current = setTimeout(function () { setLossToast(null); }, 2500);
+    }
     var newStats = Object.assign({}, stats);
     newStats.gamesPlayed = (newStats.gamesPlayed || 0) + 1;
     if (event.bet) newStats.totalWagered = (newStats.totalWagered || 0) + event.bet;
@@ -14234,7 +14290,7 @@ function FluxApp() {
     setCollection: setCollection
   })));
   if (game === "scarab") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Scarab, gp));
-  if (game === "roulette") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(RussianRoulette, gp));
+  if (game === "roulette") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(RussianRoulette, _extends({}, gp, { goreSkull: rouletteGoreSkull })));
   if (game === "stocks") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(StockTrader, gp));
   if (game === "bomb") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(BombDefuser, gp));
   return /*#__PURE__*/React.createElement(Wrap, null, splash !== "done" && /*#__PURE__*/React.createElement("div", {
@@ -15207,6 +15263,15 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Closes level-up screen after 3s instead of waiting for a tap.")),
     /*#__PURE__*/React.createElement("button", { onClick: function () { setAutoLevelDismiss(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: autoLevelDismiss ? "var(--green)" : "var(--surface)", border: autoLevelDismiss ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
     /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: autoLevelDismiss ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+  /* Gore Skull (Roulette) toggle */
+  /*#__PURE__*/React.createElement("div", {
+    style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDC80"),
+    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Gore Skull (Roulette)")),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Shows a skull with bullet hole & blood instead of the default emoji.")),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setRouletteGoreSkull(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: rouletteGoreSkull ? "#ef4444" : "var(--surface)", border: rouletteGoreSkull ? "2px solid #ef4444" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+    /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: rouletteGoreSkull ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
   /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "14px 16px",
@@ -16077,7 +16142,27 @@ function FluxApp() {
     }
   }), /*#__PURE__*/React.createElement(UpdateBanner, {
     currentVersion: VERSION
-  }), /*#__PURE__*/React.createElement(DevNews, { onSettings: function () { setShowSettings(true); } }));
+  }), lossToast && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 80,
+      right: 16,
+      zIndex: 750,
+      background: "rgba(255,94,120,0.15)",
+      border: "1px solid rgba(255,94,120,0.4)",
+      borderRadius: 12,
+      padding: "10px 18px",
+      backdropFilter: "blur(12px)",
+      animation: "lossSlideIn 2.5s ease-in-out forwards",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      boxShadow: "0 4px 20px rgba(255,94,120,0.2)"
+    }
+  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 20 } }, "\uD83D\uDCC9"), /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: "var(--accent)", fontFamily: "'JetBrains Mono',monospace" } }, "-" + lossToast.amount),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "var(--dim)", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" } }, "chips lost")
+  )), /*#__PURE__*/React.createElement(DevNews, { onSettings: function () { setShowSettings(true); } }));
 }
 var BG_STYLES = {
   "stars": {
