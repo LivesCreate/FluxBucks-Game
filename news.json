@@ -1,10 +1,9 @@
 [
   {
-    "id": 5,
-    "type": "update",
-    "icon": "🎉",
-    "title": "FluxBucks v4.7.4",
-    "date": "March 14, 2026",
-    "message": "What's new:\n\n• ⚡ Quick Replay — restart any game with same bet in one tap\n• 💀 Gore Skull toggle — new setting for Russian Roulette\n• 📉 Loss toast — slide-in notification when you lose chips\n• 🎲 Dice live win rate — see your observed win% vs expected\n• 🎨 Color Guess — Coin Flip reworked into a spinning wheel\n• 🐔 Chicken Race — slower paced with placements\n• ⬆️ Auto-Dismiss Level Up toggle in Settings\n• 🎯 Daily challenges now detect all game wins"
+    "id": 2,
+    "type": "info",
+    "icon": "👋",
+    "title": "FluxBucks is No Longer Being Updated",
+    "message": "Hey — just wanted to let you know that FluxBucks won't be receiving any more updates. I've lost the motivation to keep working on it.\n\nThe game will stay up and fully playable, nothing is being taken down. I just won't be adding new features or fixing bugs going forward.\n\nThanks for playing. It's been a fun ride."
   }
 ]
