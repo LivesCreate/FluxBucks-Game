@@ -6,8 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#050508">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
 <title>FluxBucks</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation}body{min-height:100vh;min-height:100dvh}</style>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -16235,58 +16233,8 @@ function Wrap({
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
 </script>
-<script>
-(function(){
-  var POPUP_KEY = "fluxbucks_eol_seen";
-  var style = document.createElement("style");
-  style.textContent = "@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes popUp{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}";
-  document.head.appendChild(style);
-
-  function showEndPopup(){
-    var existing = document.getElementById("eol-overlay");
-    if(existing) existing.remove();
-
-    var overlay = document.createElement("div");
-    overlay.id = "eol-overlay";
-    overlay.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);animation:fadeIn .3s ease";
-    var box = document.createElement("div");
-    box.style.cssText = "background:#0d0d12;border:2px solid #818cf8;border-radius:18px;padding:24px;width:88%;max-width:360px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;animation:popUp .3s ease";
-    box.innerHTML = '<div style="font-size:36px;margin-bottom:10px">👋</div>'
-      + '<div style="font-size:18px;font-weight:900;font-style:italic;color:#fff;margin-bottom:10px">FluxBucks is No Longer Being Updated</div>'
-      + '<p style="font-size:13px;color:#888;line-height:1.7;margin-bottom:18px">Hey — just wanted to let you know that FluxBucks won\'t be receiving any more updates. I\'ve lost the motivation to keep working on it.<br><br>The game will stay fully playable, nothing is being taken down. I just won\'t be adding new features or fixing bugs going forward.<br><br>Thanks for playing. It\'s been a fun ride.</p>'
-      + '<button id="eol-dismiss" style="padding:10px 32px;border-radius:10px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#c084fc,#818cf8);color:#fff;border:none;cursor:pointer">Got it</button>';
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    overlay.onclick = function(e){ if(e.target === overlay) dismiss(); };
-    document.getElementById("eol-dismiss").onclick = dismiss;
-
-    function dismiss(){
-      localStorage.setItem(POPUP_KEY, "1");
-      overlay.style.opacity = "0";
-      overlay.style.transition = "opacity .2s";
-      setTimeout(function(){ overlay.remove(); }, 200);
-    }
-  }
-
-  function addFloatingBtn(){
-    if(document.getElementById("eol-float-btn")) return;
-    var btn = document.createElement("div");
-    btn.id = "eol-float-btn";
-    btn.style.cssText = "position:fixed;bottom:12px;left:12px;z-index:900;width:36px;height:36px;border-radius:50%;background:#1a1a2e;border:1px solid #818cf8;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.4);";
-    btn.textContent = "📢";
-    btn.onclick = showEndPopup;
-    document.body.appendChild(btn);
-  }
-
-  if(!localStorage.getItem(POPUP_KEY)){
-    setTimeout(showEndPopup, 4000);
-  }
-
-  setTimeout(addFloatingBtn, 2000);
-})();
-</script>
-
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js").catch(function(){});}</script>
-</body>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js").catch(function(){});}</script></body>
 </html>
