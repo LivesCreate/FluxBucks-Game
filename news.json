@@ -1,9 +1,9 @@
 [
   {
-    "id": 2,
+    "id": 3,
     "type": "info",
-    "icon": "👋",
-    "title": "FluxBucks is No Longer Being Updated",
-    "message": "Hey — just wanted to let you know that FluxBucks won't be receiving any more updates. I've lost the motivation to keep working on it.\n\nThe game will stay up and fully playable, nothing is being taken down. I just won't be adding new features or fixing bugs going forward.\n\nThanks for playing. It's been a fun ride."
+    "icon": "📢",
+    "title": "FluxBucks is Mostly Discontinued",
+    "message": "Hey — just wanted to let you know that FluxBucks is mostly discontinued. No new features are being added, but it may still receive occasional updates for bugs and errors that are found.\n\nThe game will stay fully playable, nothing is being taken down.\n\nThanks for playing."
   }
 ]
