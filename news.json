@@ -1,5 +1,12 @@
 [
   {
+    "id": 4,
+    "type": "update",
+    "icon": "🔥",
+    "title": "v4.8.0 — Cloud Saves & Friends",
+    "message": "FluxBucks now supports Google sign-in! Your save data syncs to the cloud automatically so you never lose progress.\n\n• Sign in with Google from Settings → Account\n• Cloud saves sync chips, stats, achievements, and all settings\n• Add friends using friend codes and view their profiles\n• Your save merges intelligently — the one with more progress wins\n\nHead to Settings and tap 'Sign In' to get started."
+  },
+  {
     "id": 3,
     "type": "info",
     "icon": "📢",

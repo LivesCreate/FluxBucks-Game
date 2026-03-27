@@ -1,4 +1,4 @@
-var CACHE_NAME = 'flux-v4-7-5c';
+var CACHE_NAME = 'flux-v4-8-0';
 var URLS_TO_CACHE = ['./', './index.html',
   'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
