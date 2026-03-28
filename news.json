@@ -5,12 +5,5 @@
     "icon": "🔥",
     "title": "v4.8.0 — Cloud Saves & Friends",
     "message": "FluxBucks now supports Google sign-in! Your save data syncs to the cloud automatically so you never lose progress.\n\n• Sign in with Google from Settings → Account\n• Cloud saves sync chips, stats, achievements, and all settings\n• Add friends using friend codes and view their profiles\n• Your save merges intelligently — the one with more progress wins\n\nHead to Settings and tap 'Sign In' to get started."
-  },
-  {
-    "id": 3,
-    "type": "info",
-    "icon": "📢",
-    "title": "FluxBucks is Mostly Discontinued",
-    "message": "Hey — just wanted to let you know that FluxBucks is mostly discontinued. No new features are being added, but it may still receive occasional updates for bugs and errors that are found.\n\nThe game will stay fully playable, nothing is being taken down.\n\nThanks for playing."
   }
 ]
