@@ -198,7 +198,8 @@ var DEFAULT_SAVE = {
   lastPlayDate: null,
   dailyStreak: 0,
   bestDailyStreak: 0,
-  longestSession: 0
+  longestSession: 0,
+  dataSaver: false
 };
 function loadSave() {
   try {
@@ -351,6 +352,35 @@ function fbRemoveFriend(myUid, friendUid) {
   batch.delete(fbDb.collection("users").doc(myUid).collection("friends").doc(friendUid));
   batch.delete(fbDb.collection("users").doc(friendUid).collection("friends").doc(myUid));
   return batch.commit().then(function () { return true; }).catch(function () { return false; });
+}
+
+/* ═══ NETWORK MONITOR ═══════════════════════════════════════════ */
+var netStatus = { online: typeof navigator !== "undefined" ? navigator.onLine : true, type: "unknown", downlink: null, saveData: false };
+function updateNetStatus() {
+  netStatus.online = navigator.onLine;
+  var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (conn) {
+    netStatus.type = conn.effectiveType || conn.type || "unknown";
+    netStatus.downlink = conn.downlink || null;
+    netStatus.saveData = conn.saveData || false;
+  }
+}
+updateNetStatus();
+if (typeof window !== "undefined") {
+  window.addEventListener("online", function () { updateNetStatus(); if (window.__onNetChange) window.__onNetChange(); });
+  window.addEventListener("offline", function () { updateNetStatus(); if (window.__onNetChange) window.__onNetChange(); });
+  var _conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (_conn && _conn.addEventListener) _conn.addEventListener("change", function () { updateNetStatus(); if (window.__onNetChange) window.__onNetChange(); });
+}
+
+/* Returns sync interval in ms based on connection quality and data saver mode */
+function getSyncInterval(isDataSaver) {
+  if (!netStatus.online) return 0;
+  if (isDataSaver || netStatus.saveData) return 30000;
+  var t = netStatus.type;
+  if (t === "slow-2g" || t === "2g") return 20000;
+  if (t === "3g") return 12000;
+  return 5000;
 }
 
 /* ═══ SOUND SYSTEM ═══════════════════════════════════════════════ */
@@ -13885,8 +13915,20 @@ function FluxApp() {
   const [showAccount, setShowAccount] = useState(false);
   const [viewingFriend, setViewingFriend] = useState(null);
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
+  const [dataSaver, setDataSaver] = useState(save.dataSaver || false);
+  const [netInfo, setNetInfo] = useState({ online: netStatus.online, type: netStatus.type });
   const fbSyncTimer = useRef(null);
   const fbInitialLoad = useRef(false);
+
+  /* Network change listener */
+  useEffect(function () {
+    function onNetChange() {
+      updateNetStatus();
+      setNetInfo({ online: netStatus.online, type: netStatus.type });
+    }
+    window.__onNetChange = onNetChange;
+    return function () { window.__onNetChange = null; };
+  }, []);
 
   /* Firebase auth listener */
   useEffect(function () {
@@ -13933,11 +13975,14 @@ function FluxApp() {
     return function () { unsub(); };
   }, []);
 
-  /* Cloud sync on save (debounced) */
+  /* Cloud sync on save (debounced, network-aware) */
   useEffect(function () {
     if (!fbUser || !cloudSyncEnabled) return;
+    var interval = getSyncInterval(dataSaver);
+    if (interval === 0) return; /* offline — skip */
     if (fbSyncTimer.current) clearTimeout(fbSyncTimer.current);
     fbSyncTimer.current = setTimeout(function () {
+      if (!netStatus.online) return;
       var saveData = {
         chips: chips, safeMode: safeMode, toastPos: toastPos, username: username,
         quickPlay: quickPlay, theme: theme, soundOn: soundOn, avatar: avatar,
@@ -13947,15 +13992,16 @@ function FluxApp() {
         achievements: achievements, betHistory: betHistory,
         balanceHistory: balanceHistory, collection: collection, stats: stats,
         xp: xp, lastPlayDate: lastPlayDate, dailyStreak: dailyStreak,
-        bestDailyStreak: bestDailyStreak, longestSession: longestSession
+        bestDailyStreak: bestDailyStreak, longestSession: longestSession,
+        dataSaver: dataSaver
       };
       fbSaveToCloud(fbUser.uid, saveData).then(function (ok) {
         if (ok) setFbLastSync(new Date());
       });
       fbSaveProfile(fbUser.uid, saveData);
-    }, 5000);
+    }, interval);
     return function () { if (fbSyncTimer.current) clearTimeout(fbSyncTimer.current); };
-  }, [fbUser, cloudSyncEnabled, chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, rouletteGoreSkull, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession]);
+  }, [fbUser, cloudSyncEnabled, dataSaver, netInfo, chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, rouletteGoreSkull, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession]);
 
   function doFbSignIn() {
     setFbError(null);
@@ -14071,10 +14117,11 @@ function FluxApp() {
       lastPlayDate: lastPlayDate,
       dailyStreak: dailyStreak,
       bestDailyStreak: bestDailyStreak,
-      longestSession: longestSession
+      longestSession: longestSession,
+      dataSaver: dataSaver
     };
     writeSave(saveData);
-  }, [chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, rouletteGoreSkull, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession]);
+  }, [chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, rouletteGoreSkull, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession, dataSaver]);
 
   // Track game results for achievements/stats/history
   function trackResult(event) {
@@ -14305,6 +14352,7 @@ function FluxApp() {
     setDailyChallengeCompleted(null);
     afkDismissRef.current = 0;
     setAfkDismissCount(0);
+    setDataSaver(false);
     setShowResetConfirm(false);
     setShowSettings(false);
     setTimeout(function () { window.location.reload(); }, 300);
@@ -15578,6 +15626,15 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Closes level-up screen after 3s instead of waiting for a tap.")),
     /*#__PURE__*/React.createElement("button", { onClick: function () { setAutoLevelDismiss(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: autoLevelDismiss ? "var(--green)" : "var(--surface)", border: autoLevelDismiss ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
     /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: autoLevelDismiss ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+  /* Data Saver */
+  /*#__PURE__*/React.createElement("div", {
+    style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDCF6"),
+    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Data Saver")),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Syncs less often to save data." + (netInfo.type !== "unknown" ? " Network: " + netInfo.type + (netInfo.online ? "" : " (offline)") : ""))),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setDataSaver(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: dataSaver ? "var(--green)" : "var(--surface)", border: dataSaver ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+    /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: dataSaver ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
   /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "14px 16px",
@@ -16479,6 +16536,31 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: "var(--accent)", fontFamily: "'JetBrains Mono',monospace" } }, "-" + lossToast.amount),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 9, color: "var(--dim)", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" } }, "chips lost")
   )), /*#__PURE__*/React.createElement(DevNews, { onSettings: function () { setShowSettings(true); } }),
+
+  /* ═══ OFFLINE BANNER ═══ */
+  splash === "done" && !netInfo.online && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 800,
+      background: "linear-gradient(135deg, rgba(30,30,40,0.97), rgba(20,20,30,0.97))",
+      borderBottom: "1px solid rgba(255,207,86,0.3)",
+      padding: "10px 16px",
+      paddingTop: "calc(10px + env(safe-area-inset-top, 0px))",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      backdropFilter: "blur(12px)",
+      animation: "fadeUp 0.3s ease"
+    }
+  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 18, flexShrink: 0 } }, "\uD83D\uDCF5"),
+    /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--neon2)" } }, "You're Offline"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginTop: 2, lineHeight: 1.4 } }, "Cloud saves, Google sign-in, and friends are unavailable. Your progress is saved locally.")
+    )
+  ),
 
   /* ═══ ACCOUNT OVERLAY ═══ */
   showAccount && /*#__PURE__*/React.createElement("div", {
