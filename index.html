@@ -26,7 +26,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.8.0";
+const VERSION = "v4.8.1";
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -2255,12 +2255,24 @@ function Starfield() {
       return x > cx - zoneW / 2 && x < cx + zoneW / 2 && y > zoneTop && y < zoneTop + zoneH;
     }
 
-    // === WHITE STARS - scale count with screen area ===
+    // === WHITE STARS - scale count with screen area, with spacing ===
     var STAR_COUNT = Math.max(250, Math.floor(W * H / 4000));
+    var MIN_STAR_DIST = Math.max(8, Math.sqrt(W * H / STAR_COUNT) * 0.45);
     const stars = [];
+    function tooClose(nx, ny) {
+      for (var si = stars.length - 1; si >= Math.max(0, stars.length - 60); si--) {
+        var dx = stars[si].x - nx, dy = stars[si].y - ny;
+        if (dx * dx + dy * dy < MIN_STAR_DIST * MIN_STAR_DIST) return true;
+      }
+      return false;
+    }
     for (let i = 0; i < STAR_COUNT; i++) {
-      let sx = Math.random() * W,
+      let sx, sy, attempts = 0;
+      do {
+        sx = Math.random() * W;
         sy = Math.random() * H;
+        attempts++;
+      } while (tooClose(sx, sy) && attempts < 12);
       // Gently nudge stars out of the small title zone
       if (isInTextZone(sx, sy)) {
         sy = sy + 100 + Math.random() * 200;
@@ -12753,17 +12765,23 @@ function HelpPage({
     title: "📈 Balance Graph",
     text: "Found in Stats, this tracks your chip balance over time. Tap it to expand and scroll through your history. Use the range buttons (50, 100, 200, All) to see different time spans."
   }, {
+    title: "🔐 Account & Cloud Saves",
+    text: "Sign in with Google from Settings → Account to enable cloud saves. Your chips, stats, achievements, and all settings sync automatically to the cloud so you never lose progress. If you play on multiple devices, your saves merge intelligently — the one with more progress wins."
+  }, {
+    title: "👥 Friends",
+    text: "Once signed in, you get a unique friend code. Share it with others to add friends. You can view their profiles, stats, and levels from the Friends panel in Settings."
+  }, {
     title: "🎮 Game Types",
     text: "CARDS = card-based games, LUCK = pure chance, RISK = high risk/reward, SKILL = skill-based (earn more XP), INSTANT = quick results, LOTTERY = number picks, REFLEX = speed tests, BRAIN = puzzles, MEMORY = memory games, WORDS = word games, CRASH = multiplier games, PACKS = lootbox opening."
   }, {
     title: "🎨 Customization",
-    text: "Change your theme, avatar, and background in Settings or through the quick buttons in your profile popup (tap your name at the bottom left)."
+    text: "Change your theme, avatar, and background in Settings → Look & Sound, or through the quick buttons in your profile popup (tap your name at the bottom left)."
   }, {
     title: "📤 Share Card",
     text: "Tap Share in your profile to generate an image card with your stats. Save it to your photos or copy it to share with friends."
   }, {
     title: "🔧 Troubleshooting",
-    text: "If anything gets stuck, open Settings and tap 'Force Main Menu' to reset to the home screen. 'Refresh App' clears the cache and reloads everything fresh."
+    text: "Main Menu — Used to return to the main menu if a game gets stuck or you can't exit normally. Refresh — Clears the cache and reloads the app to fix display or loading issues. Reset — Erases all local data and starts fresh (use with caution)."
   }];
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -12911,7 +12929,7 @@ function InfoPanel({
       marginBottom: 14,
       lineHeight: 1.5
     }
-  }, "FluxBucks games are inspired by popular online casino and skill game platforms. All games use virtual chips only \u2014 no real money involved."), GAME_CREDITS.map(function (g) {
+  }, "FluxBucks games are inspired by popular online casino and skill game platforms. All games use virtual chips only \u2014 no real money involved. Sign in with Google to enable cloud saves and add friends."), GAME_CREDITS.map(function (g) {
     return /*#__PURE__*/React.createElement("div", {
       key: g.name,
       style: {
@@ -13874,6 +13892,10 @@ function FluxApp() {
   const [rouletteGoreSkull, setRouletteGoreSkull] = useState(save.rouletteGoreSkull || false);
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [showBgRequest, setShowBgRequest] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+  const [showLookSound, setShowLookSound] = useState(false);
+  const [showLookSoundPanel, setShowLookSoundPanel] = useState(false);
+  const [showCustomize, setShowCustomize] = useState(false);
   const [clickParticles, setClickParticles] = useState([]);
   const [lossToast, setLossToast] = useState(null);
   const lossToastTimer = useRef(null);
@@ -14365,6 +14387,9 @@ function FluxApp() {
     setShowThemePicker(false);
     setShowAvatarPicker(false);
     setShowBgPicker(false);
+    setShowLookSound(false);
+    setShowLookSoundPanel(false);
+    setShowCustomize(false);
   }
 
   // Check safe mode achievement
@@ -14906,7 +14931,7 @@ function FluxApp() {
       opacity: hubPhase === "cards" ? 1 : 0,
       transition: "opacity 0.5s ease-out 2s"
     }
-  }, safeMode ? "All games are skill-based" : "All games use virtual chips · No real money")), splash === "done" && !showSettings && /*#__PURE__*/React.createElement("button", {
+  }, safeMode ? "All games are skill-based" : "All games use virtual chips · No real money")), splash === "done" && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setEditUsername(username);
       setShowSettings(true);
@@ -14928,7 +14953,9 @@ function FluxApp() {
       zIndex: 700,
       backdropFilter: "blur(8px)",
       boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-      opacity: 0.6
+      opacity: showSettings ? 0 : 0.6,
+      pointerEvents: showSettings ? "none" : "auto",
+      transition: "opacity 0.2s"
     }
   }, "\u2699\uFE0F"), splash === "done" && !showSettings && username && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
@@ -14936,8 +14963,8 @@ function FluxApp() {
     },
     style: {
       position: "fixed",
-      bottom: isWide ? 22 : 18,
-      left: isWide ? 22 : 18,
+      bottom: isWide ? 22 : "calc(18px + env(safe-area-inset-bottom, 0px))",
+      left: isWide ? 64 : "calc(64px + env(safe-area-inset-left, 0px))",
       height: isWide ? 50 : 44,
       borderRadius: 22,
       background: "var(--surface)",
@@ -14965,7 +14992,9 @@ function FluxApp() {
       alignItems: "flex-end",
       justifyContent: "flex-start",
       padding: isWide ? 22 : 18,
-      paddingBottom: isWide ? 80 : 70
+      paddingBottom: isWide ? 80 : 70,
+      background: "rgba(0,0,0,0.7)",
+      backdropFilter: "blur(8px)"
     },
     onClick: function (e) {
       if (e.target === e.currentTarget) setShowProfile(false);
@@ -15093,32 +15122,7 @@ function FluxApp() {
         }
       }, item[2]));
     }));
-  }(), dailyChallenge && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 8,
-      padding: "8px 10px",
-      background: dailyChallengeCompleted === getTodayDateStr() ? "rgba(74,222,128,0.08)" : "rgba(255,215,0,0.06)",
-      borderRadius: 8,
-      border: dailyChallengeCompleted === getTodayDateStr() ? "1px solid rgba(74,222,128,0.2)" : "1px solid rgba(255,215,0,0.15)"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      fontWeight: 700,
-      color: dailyChallengeCompleted === getTodayDateStr() ? "var(--green)" : "#ffd700",
-      marginBottom: 2
-    }
-  }, dailyChallengeCompleted === getTodayDateStr() ? "✅ Daily Challenge Complete" : "⭐ " + dailyChallenge.desc), dailyChallengeCompleted !== getTodayDateStr() && dailyChallenge.count && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 9,
-      color: "var(--dim)"
-    }
-  }, dailyChallengeProgress + "/" + dailyChallenge.count + " · +" + dailyChallenge.reward + " chips"), dailyChallengeCompleted === getTodayDateStr() && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 9,
-      color: "var(--dim)"
-    }
-  }, "Come back tomorrow for a new challenge")), /*#__PURE__*/React.createElement("div", {
+  }(), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -15297,7 +15301,7 @@ function FluxApp() {
       animation: "fadeUp 0.25s",
       backdropFilter: "blur(16px)"
     }
-  }, !showResetConfirm && !showToastPicker && !showThemePicker && !showAvatarPicker && !showBgPicker && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, !showResetConfirm && !showToastPicker && !showThemePicker && !showAvatarPicker && !showBgPicker && !showLookSoundPanel && !showCustomize && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -15417,14 +15421,20 @@ function FluxApp() {
       fontSize: 14,
       color: "var(--text)"
     }
-  }, "Username")), /*#__PURE__*/React.createElement("input", {
+  }, "Username")), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 6, alignItems: "center" }
+  }, /*#__PURE__*/React.createElement("input", {
     value: editUsername,
     onChange: function (e) {
-      setEditUsername(e.target.value.slice(0, 20));
+      setEditUsername(e.target.value.slice(0, 30));
     },
     placeholder: "Enter a name...",
+    spellCheck: false,
+    autoCorrect: "off",
+    autoCapitalize: "off",
     style: {
-      width: "100%",
+      flex: 1,
+      minWidth: 0,
       padding: "8px 12px",
       borderRadius: 8,
       background: "var(--surface)",
@@ -15433,362 +15443,87 @@ function FluxApp() {
       fontSize: 14,
       fontFamily: "'JetBrains Mono',monospace"
     }
-  }), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (savingName) return;
+      setSavingName(true);
+      setUsername(editUsername);
+      setTimeout(function () { setSavingName(false); }, 1800);
+    },
+    disabled: savingName,
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
+      fontSize: 16,
+      fontWeight: 700,
+      background: savingName ? "rgba(74,222,128,0.15)" : "var(--surface)",
+      color: savingName ? "var(--green)" : "var(--dim)",
+      border: savingName ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      transition: "all 0.3s",
+      padding: 0
+    }
+  }, savingName ? /*#__PURE__*/React.createElement("span", { style: { display: "inline-block", animation: "starRotate 1s linear infinite", fontSize: 14 } }, "\u23F3") : "\u2714")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "var(--dim)",
       marginTop: 4
     }
-  }, editUsername.length + "/20 · Shows on stats & share cards")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "14px 16px",
-      background: "var(--surface2)",
-      borderRadius: 12,
-      border: "1px solid var(--border)",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "🔔"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "var(--text)"
-    }
-  }, "Popup Position")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--dim)",
-      lineHeight: 1.4
-    }
-  }, "Where achievements appear.")), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setShowToastPicker(true);
-    },
-    style: {
-      padding: "6px 14px",
-      borderRadius: 8,
-      fontSize: 11,
-      fontWeight: 700,
-      background: "var(--surface)",
-      color: "var(--cool)",
-      border: "1px solid rgba(86,193,255,0.3)",
-      whiteSpace: "nowrap"
-    }
-  }, toastPos === "bottom-right" ? "↘ Bottom Right" : toastPos === "bottom-left" ? "↙ Bottom Left" : toastPos === "top-right" ? "↗ Top Right" : "↖ Top Left"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "14px 16px",
-      background: "var(--surface2)",
-      borderRadius: 12,
-      border: "1px solid var(--border)",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "⚡"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "var(--text)"
-    }
-  }, "Quick Play")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--dim)",
-      lineHeight: 1.4,
-      maxWidth: 200
-    }
-  }, "Skip game card animations.")), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setQuickPlay(function (q) {
-        return !q;
-      });
-    },
-    style: {
-      width: 48,
-      height: 28,
-      borderRadius: 14,
-      background: quickPlay ? "var(--green)" : "var(--surface)",
-      border: quickPlay ? "2px solid var(--green)" : "2px solid var(--border)",
-      position: "relative",
-      transition: "all 0.3s",
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 20,
-      height: 20,
-      borderRadius: "50%",
-      background: "#fff",
-      position: "absolute",
-      top: 2,
-      left: quickPlay ? 24 : 2,
-      transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
-    }
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "14px 16px",
-      background: "var(--surface2)",
-      borderRadius: 12,
-      border: "1px solid var(--border)",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "🔊"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "var(--text)"
-    }
-  }, "Sound Effects")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--dim)",
-      lineHeight: 1.4,
-      maxWidth: 200
-    }
-  }, "Plays audio on wins, losses, and actions.")), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setSoundOn(function (s) {
-        return !s;
-      });
-    },
-    style: {
-      width: 48,
-      height: 28,
-      borderRadius: 14,
-      background: soundOn ? "var(--green)" : "var(--surface)",
-      border: soundOn ? "2px solid var(--green)" : "2px solid var(--border)",
-      position: "relative",
-      transition: "all 0.3s",
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 20,
-      height: 20,
-      borderRadius: "50%",
-      background: "#fff",
-      position: "absolute",
-      top: 2,
-      left: soundOn ? 24 : 2,
-      transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
-    }
-  }))),
-  /* Auto-dismiss level up */
+  }, editUsername.length + "/30 · Shows on stats & share cards")),
+  /* Data Saver — moved to main settings */
   /*#__PURE__*/React.createElement("div", {
-    style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
-    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\u2B06\uFE0F"),
-    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Auto-Dismiss Level Up")),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Closes level-up screen after 3s instead of waiting for a tap.")),
-    /*#__PURE__*/React.createElement("button", { onClick: function () { setAutoLevelDismiss(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: autoLevelDismiss ? "var(--green)" : "var(--surface)", border: autoLevelDismiss ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-    /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: autoLevelDismiss ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
-  /* Data Saver */
-  /*#__PURE__*/React.createElement("div", {
-    style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }
+    style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
     /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDCF6"),
     /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Data Saver")),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Syncs less often to save data." + (netInfo.type !== "unknown" ? " Network: " + netInfo.type + (netInfo.online ? "" : " (offline)") : ""))),
     /*#__PURE__*/React.createElement("button", { onClick: function () { setDataSaver(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: dataSaver ? "var(--green)" : "var(--surface)", border: dataSaver ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
     /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: dataSaver ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+  /* Look & Sound sub-panel button */
+  /*#__PURE__*/React.createElement("button", {
+    onClick: function () { setShowLookSoundPanel(true); },
+    style: {
+      width: "100%",
+      padding: "14px 16px",
+      borderRadius: 12,
+      background: "var(--surface2)",
+      border: "1px solid var(--border)",
+      marginBottom: 10,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      textAlign: "left",
+      color: "var(--text)"
+    }
+  }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83C\uDFA8"),
+    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14 } }, "Look & Sound")),
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--dim)" } }, "\u203A")),
+  /* Customize sub-panel button */
+  /*#__PURE__*/React.createElement("button", {
+    onClick: function () { setShowCustomize(true); },
+    style: {
+      width: "100%",
+      padding: "14px 16px",
+      borderRadius: 12,
+      background: "var(--surface2)",
+      border: "1px solid var(--border)",
+      marginBottom: 10,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      textAlign: "left",
+      color: "var(--text)"
+    }
+  }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\u2699\uFE0F"),
+    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14 } }, "Customize")),
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--dim)" } }, "\u203A")),
   /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "14px 16px",
-      background: "var(--surface2)",
-      borderRadius: 12,
-      border: "1px solid var(--border)",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "🎨"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "var(--text)"
-    }
-  }, "Theme")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--dim)",
-      lineHeight: 1.4
-    }
-  }, THEMES[theme] ? THEMES[theme].name : "Cosmic")), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setShowThemePicker(true);
-    },
-    style: {
-      padding: "6px 14px",
-      borderRadius: 8,
-      fontSize: 11,
-      fontWeight: 700,
-      background: "var(--surface)",
-      color: "var(--cool)",
-      border: "1px solid rgba(86,193,255,0.3)",
-      whiteSpace: "nowrap"
-    }
-  }, "Change"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "14px 16px",
-      background: "var(--surface2)",
-      borderRadius: 12,
-      border: "1px solid var(--border)",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, avatar), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "var(--text)"
-    }
-  }, "Avatar")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--dim)",
-      lineHeight: 1.4
-    }
-  }, "Your profile icon.")), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setShowAvatarPicker(true);
-    },
-    style: {
-      padding: "6px 14px",
-      borderRadius: 8,
-      fontSize: 11,
-      fontWeight: 700,
-      background: "var(--surface)",
-      color: "var(--cool)",
-      border: "1px solid rgba(86,193,255,0.3)",
-      whiteSpace: "nowrap"
-    }
-  }, "Change"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "14px 16px",
-      background: "var(--surface2)",
-      borderRadius: 12,
-      border: "1px solid var(--border)",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, BACKGROUNDS[bgPreset] ? BACKGROUNDS[bgPreset].icon : "✦"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "var(--text)"
-    }
-  }, "Background")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--dim)",
-      lineHeight: 1.4
-    }
-  }, BACKGROUNDS[bgPreset] ? BACKGROUNDS[bgPreset].name : "Cosmic Stars")), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setShowBgPicker(true);
-    },
-    style: {
-      padding: "6px 14px",
-      borderRadius: 8,
-      fontSize: 11,
-      fontWeight: 700,
-      background: "var(--surface)",
-      color: "var(--cool)",
-      border: "1px solid rgba(86,193,255,0.3)",
-      whiteSpace: "nowrap"
-    }
-  }, "Change"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
@@ -16351,7 +16086,96 @@ function FluxApp() {
       color: "#fff",
       border: "2px solid #8b5cf6"
     }
-  }, "Done")))), showInfo && /*#__PURE__*/React.createElement(InfoPanel, {
+  }, "Done"))),
+  /* ═══ LOOK & SOUND SUB-PANEL ═══ */
+  showLookSoundPanel && /*#__PURE__*/React.createElement("div", { style: { animation: "fadeUp 0.2s" } },
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+        /*#__PURE__*/React.createElement("button", { onClick: function () { setShowLookSoundPanel(false); }, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2190"),
+        /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\uD83C\uDFA8 Look & Sound")),
+      /*#__PURE__*/React.createElement("button", { onClick: closeSettings, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")),
+    /* Sound Effects */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDD0A"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Sound Effects")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Plays audio on wins, losses, and actions.")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setSoundOn(function (s) { return !s; }); }, style: { width: 48, height: 28, borderRadius: 14, background: soundOn ? "var(--green)" : "var(--surface)", border: soundOn ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: soundOn ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+    /* Auto-Dismiss Level Up */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\u2B06\uFE0F"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Auto-Dismiss Level Up")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Closes level-up screen after 3s instead of waiting for a tap.")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setAutoLevelDismiss(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: autoLevelDismiss ? "var(--green)" : "var(--surface)", border: autoLevelDismiss ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: autoLevelDismiss ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+    /* Theme */
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
+      /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83C\uDFA8"),
+          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Theme")),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4 } }, THEMES[theme] ? THEMES[theme].name : "Cosmic")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setShowThemePicker(true); setShowLookSoundPanel(false); }, style: { padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", whiteSpace: "nowrap" } }, "Change"))),
+    /* Avatar */
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
+      /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, avatar),
+          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Avatar")),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4 } }, "Your profile icon.")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setShowAvatarPicker(true); setShowLookSoundPanel(false); }, style: { padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", whiteSpace: "nowrap" } }, "Change"))),
+    /* Background */
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
+      /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, BACKGROUNDS[bgPreset] ? BACKGROUNDS[bgPreset].icon : "\u2726"),
+          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Background")),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4 } }, BACKGROUNDS[bgPreset] ? BACKGROUNDS[bgPreset].name : "Cosmic Stars")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setShowBgPicker(true); setShowLookSoundPanel(false); }, style: { padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", whiteSpace: "nowrap" } }, "Change"))),
+    /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", marginTop: 8 } },
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setShowLookSoundPanel(false); }, style: { padding: "10px 32px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "2px solid #8b5cf6" } }, "Done"))),
+  /* ═══ CUSTOMIZE SUB-PANEL ═══ */
+  showCustomize && /*#__PURE__*/React.createElement("div", { style: { animation: "fadeUp 0.2s" } },
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+        /*#__PURE__*/React.createElement("button", { onClick: function () { setShowCustomize(false); }, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2190"),
+        /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\u2699\uFE0F Customize")),
+      /*#__PURE__*/React.createElement("button", { onClick: closeSettings, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")),
+    /* Toast Position */
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
+      /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDD14"),
+          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Popup Position")),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4 } }, "Where achievements appear.")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setShowToastPicker(true); setShowCustomize(false); }, style: { padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", whiteSpace: "nowrap" } }, toastPos === "bottom-right" ? "\u2198 Bottom Right" : toastPos === "bottom-left" ? "\u2199 Bottom Left" : toastPos === "top-right" ? "\u2197 Top Right" : "\u2196 Top Left"))),
+    /* Quick Play */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\u26A1"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Quick Play")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Skip game card animations.")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setQuickPlay(function (q) { return !q; }); }, style: { width: 48, height: 28, borderRadius: 14, background: quickPlay ? "var(--green)" : "var(--surface)", border: quickPlay ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: quickPlay ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+    /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", marginTop: 8 } },
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setShowCustomize(false); }, style: { padding: "10px 32px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "2px solid #8b5cf6" } }, "Done"))),
+  ), showInfo && /*#__PURE__*/React.createElement(InfoPanel, {
     onClose: function () {
       setShowInfo(false);
     }
@@ -16781,7 +16605,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
     box.style.cssText = "background:#0d0d12;border:2px solid #818cf8;border-radius:18px;padding:24px;width:88%;max-width:360px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;animation:popUp .3s ease";
     box.innerHTML = '<div style="font-size:36px;margin-bottom:10px">👋</div>'
       + '<div style="font-size:18px;font-weight:900;font-style:italic;color:#fff;margin-bottom:10px">FluxBucks is Mostly Discontinued</div>'
-      + '<p style="font-size:13px;color:#888;line-height:1.7;margin-bottom:18px">Hey — just wanted to let you know that FluxBucks is mostly discontinued. No new features are being added, but it may still receive occasional updates for bugs and errors that are found.<br><br>The game will stay fully playable, nothing is being taken down.<br><br>Thanks for playing.</p>'
+      + '<p style="font-size:13px;color:#888;line-height:1.7;margin-bottom:18px">Hey — just wanted to let you know that FluxBucks is mostly discontinued. Occasional updates may still be added to improve your experience or help the game run better.<br><br>The game will stay fully playable, nothing is being taken down.<br><br>Thanks for playing.</p>'
       + '<button id="eol-dismiss" style="padding:10px 32px;border-radius:10px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#c084fc,#818cf8);color:#fff;border:none;cursor:pointer">Got it</button>';
     overlay.appendChild(box);
     document.body.appendChild(overlay);

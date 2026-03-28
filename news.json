@@ -1,9 +1,9 @@
 [
   {
-    "id": 4,
+    "id": 5,
     "type": "update",
-    "icon": "🔥",
-    "title": "v4.8.0 — Cloud Saves & Friends",
-    "message": "FluxBucks now supports Google sign-in! Your save data syncs to the cloud automatically so you never lose progress.\n\n• Sign in with Google from Settings → Account\n• Cloud saves sync chips, stats, achievements, and all settings\n• Add friends using friend codes and view their profiles\n• Your save merges intelligently — the one with more progress wins\n\nHead to Settings and tap 'Sign In' to get started."
+    "icon": "🔧",
+    "title": "v4.8.1 — Quality of Life",
+    "message": "Small improvements to make FluxBucks feel smoother.\n\n• Settings reorganized — Look & Sound and Customize are now sub-panels\n• Data Saver moved to the main settings list\n• Username field expanded to 30 characters\n• Star backgrounds distribute more evenly\n• Profile popup has a cleaner backdrop\n• How to Play updated with cloud save & friends info\n• Various layout and consistency fixes"
   }
 ]
