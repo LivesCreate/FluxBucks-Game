@@ -14568,7 +14568,13 @@ function FluxApp() {
     }, 600);
     function checkLoaded() {
       if (document.fonts && document.fonts.ready) {
+        var fontTimeout = setTimeout(function () { loaded = true; tryTransition(); }, 3000);
         document.fonts.ready.then(function () {
+          clearTimeout(fontTimeout);
+          loaded = true;
+          tryTransition();
+        }).catch(function () {
+          clearTimeout(fontTimeout);
           loaded = true;
           tryTransition();
         });
