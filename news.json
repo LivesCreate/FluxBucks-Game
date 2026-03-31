@@ -1,9 +1,9 @@
 [
   {
-    "id": 5,
+    "id": 6,
     "type": "update",
-    "icon": "ğŸ”§",
-    "title": "v4.8.1 â€” Quality of Life",
-    "message": "Small improvements to make FluxBucks feel smoother.\n\nâ€¢ Settings reorganized â€” Look & Sound and Customize are now sub-panels\nâ€¢ Data Saver moved to the main settings list\nâ€¢ Username field expanded to 30 characters\nâ€¢ Star backgrounds distribute more evenly\nâ€¢ Profile popup has a cleaner backdrop\nâ€¢ How to Play updated with cloud save & friends info\nâ€¢ Various layout and consistency fixes"
+    "icon": "í ¼í¼Ÿ",
+    "title": "v4.9.0 â€” Leaderboards, Gifting & More",
+    "message": "The biggest FluxBucks update yet!\n\nâ€¢ í ¼í¿† Leaderboards â€” Compete globally or with friends across every game\nâ€¢ í ¼í¾ Gift FluxBucks â€” Send chips to friends directly\nâ€¢ âš”ï¸ Challenge a Friend â€” 48-hour head-to-head game challenges\nâ€¢ í ¼í¿… Tier System â€” Bronze through Master ranks based on lifetime XP\nâ€¢ í ½í´” Notifications â€” Get alerted for gifts, challenges, and streaks\nâ€¢ í ½í³ˆ Improved analytics and error logging under the hood\n\nHead to the hub and tap the trophy icon to see leaderboards!"
   }
 ]

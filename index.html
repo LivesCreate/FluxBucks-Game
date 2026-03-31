@@ -26,7 +26,8 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.8.1";
+const VERSION = "v4.9.0";
+try { if (typeof firebase !== "undefined") initErrorLogging(); } catch(e) {}
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -313,6 +314,7 @@ function fbSaveProfile(uid, data) {
     longestWinStreak: data.stats && data.stats.longestWinStreak || 0,
     achievementCount: (data.achievements || []).length,
     bestDailyStreak: data.bestDailyStreak || 0,
+    tier: getTier(data.xp || 0).name,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   return fbDb.collection("profiles").doc(uid).set(profile, { merge: true }).catch(function (e) { console.warn("Profile save failed:", e); });
@@ -352,6 +354,236 @@ function fbRemoveFriend(myUid, friendUid) {
   batch.delete(fbDb.collection("users").doc(myUid).collection("friends").doc(friendUid));
   batch.delete(fbDb.collection("users").doc(friendUid).collection("friends").doc(myUid));
   return batch.commit().then(function () { return true; }).catch(function () { return false; });
+}
+
+
+/* ═══ TIER SYSTEM (Feature 3) ═══════════════════════════════════ */
+var TIERS = [
+  { name: "Bronze", min: 0, color: "#cd7f32", icon: "\uD83E\uDD49" },
+  { name: "Silver", min: 1000, color: "#c0c0c0", icon: "\uD83E\uDD48" },
+  { name: "Gold", min: 5000, color: "#ffd700", icon: "\uD83E\uDD47" },
+  { name: "Platinum", min: 20000, color: "#40e0d0", icon: "\uD83D\uDC8E" },
+  { name: "Diamond", min: 50000, color: "#b9f2ff", icon: "\u2B50" },
+  { name: "Master", min: 100000, color: "#ff6b6b", icon: "\uD83D\uDC51" }
+];
+function getTier(lifetimeXp) {
+  var tier = TIERS[0];
+  for (var i = TIERS.length - 1; i >= 0; i--) {
+    if (lifetimeXp >= TIERS[i].min) { tier = TIERS[i]; break; }
+  }
+  return tier;
+}
+function getTierProgress(lifetimeXp) {
+  var current = getTier(lifetimeXp);
+  var nextIdx = TIERS.indexOf(current) + 1;
+  if (nextIdx >= TIERS.length) return { current: current, next: null, progress: 1 };
+  var next = TIERS[nextIdx];
+  var progress = (lifetimeXp - current.min) / (next.min - current.min);
+  return { current: current, next: next, progress: Math.min(1, progress) };
+}
+
+/* ═══ ERROR LOGGING (Feature 8) ═══════════════════════════════════ */
+var ERROR_LOGGING_ENABLED = true;
+var _errorCount = 0;
+var _errorResetTimer = null;
+var _recentErrors = {};
+function logError(info) {
+  try {
+    if (!ERROR_LOGGING_ENABLED || !fbAvailable || !fbDb) return;
+    if (_errorCount >= 5) return;
+    var msg = (info.message || "").slice(0, 200);
+    if (!msg) return;
+    var now = Date.now();
+    if (_recentErrors[msg] && now - _recentErrors[msg] < 300000) return;
+    _recentErrors[msg] = now;
+    _errorCount++;
+    if (!_errorResetTimer) {
+      _errorResetTimer = setInterval(function () { _errorCount = 0; }, 60000);
+    }
+    var uid = "anonymous";
+    try { if (fbAuth && fbAuth.currentUser) uid = fbAuth.currentUser.uid; } catch(e) {}
+    fbDb.collection("errorLogs").add({
+      message: msg,
+      stack: (info.stack || "").slice(0, 500),
+      source: (info.source || "").slice(0, 200),
+      line: info.lineno || 0,
+      col: info.colno || 0,
+      userId: uid,
+      version: typeof VERSION !== "undefined" ? VERSION : "unknown",
+      userAgent: (navigator.userAgent || "").slice(0, 200),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(function(){});
+  } catch(e) {}
+}
+function initErrorLogging() {
+  if (!ERROR_LOGGING_ENABLED) return;
+  window.onerror = function(message, source, lineno, colno, error) {
+    logError({ message: message, source: source, lineno: lineno, colno: colno, stack: error && error.stack });
+  };
+  window.onunhandledrejection = function(event) {
+    logError({ message: event.reason && event.reason.message || String(event.reason), stack: event.reason && event.reason.stack });
+  };
+}
+
+/* ═══ ANALYTICS (Feature 9) ════════════════════════════════════════ */
+var ANALYTICS_ENABLED = true;
+var _analyticsSessionStart = Date.now();
+var _lastBetLog = 0;
+function logAnalytics(eventName, data) {
+  try {
+    if (!ANALYTICS_ENABLED || !fbAvailable || !fbDb) return;
+    if (Date.now() - _analyticsSessionStart < 3000) return;
+    var uid = "anonymous";
+    try { if (fbAuth && fbAuth.currentUser) uid = fbAuth.currentUser.uid; } catch(e) {}
+    if (eventName === "bet_placed" && Date.now() - _lastBetLog < 1000) return;
+    if (eventName === "bet_placed") _lastBetLog = Date.now();
+    var doc = Object.assign({ event: eventName, userId: uid, version: typeof VERSION !== "undefined" ? VERSION : "unknown", timestamp: firebase.firestore.FieldValue.serverTimestamp() }, data || {});
+    fbDb.collection("analytics").add(doc).catch(function(){});
+    /* Update summary counters */
+    var summaryRef = fbDb.collection("analytics").doc("summary");
+    var inc = firebase.firestore.FieldValue.increment(1);
+    var updates = {};
+    if (eventName === "app_opened") updates.totalAppOpens = inc;
+    if (eventName === "game_opened") { updates.totalGamesOpened = inc; if (data && data.game) updates["gameOpenCounts." + data.game] = inc; }
+    if (eventName === "bet_placed") updates.totalBetsPlaced = inc;
+    if (eventName === "achievement_unlocked") updates.totalAchievementsUnlocked = inc;
+    if (eventName === "tier_up") updates.totalTierUps = inc;
+    if (Object.keys(updates).length > 0) summaryRef.set(updates, { merge: true }).catch(function(){});
+    /* DAU tracking */
+    if (eventName === "app_opened" && uid !== "anonymous") {
+      var today = new Date().toISOString().split("T")[0];
+      fbDb.collection("users").doc(uid).collection("sessions").doc(today).set({ active: true }, { merge: true }).catch(function(){});
+    }
+  } catch(e) {}
+}
+
+/* ═══ LEADERBOARD (Feature 1) ═══════════════════════════════════ */
+function fbUpdateLeaderboard(gameId, uid, data) {
+  if (!fbAvailable || !fbDb || !uid || !gameId) return;
+  try {
+    fbDb.collection("leaderboards").doc(gameId).collection("scores").doc(uid).set({
+      username: data.username || "Player",
+      avatar: data.avatar || "\uD83D\uDC64",
+      tier: getTier(data.lifetimeXp || 0).name,
+      score: data.score || 0,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(function(){});
+  } catch(e) {}
+}
+function fbGetLeaderboard(gameId) {
+  if (!fbAvailable || !fbDb || !gameId) return Promise.resolve([]);
+  return fbDb.collection("leaderboards").doc(gameId).collection("scores")
+    .orderBy("score", "desc").limit(100).get()
+    .then(function(snap) {
+      var results = [];
+      snap.forEach(function(d) { results.push(Object.assign({ uid: d.id }, d.data())); });
+      return results;
+    }).catch(function(e) { console.warn("Leaderboard load failed:", e); return []; });
+}
+
+/* ═══ GIFTING (Feature 2) ═══════════════════════════════════════ */
+function fbSendGift(fromUid, toUid, amount, fromUsername) {
+  if (!fbAvailable || !fbDb || !fromUid || !toUid || amount < 100) return Promise.reject("Invalid");
+  return fbDb.collection("gifts").add({
+    from: fromUid,
+    to: toUid,
+    amount: amount,
+    fromUsername: fromUsername || "Player",
+    read: false,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+function fbCheckGifts(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve([]);
+  return fbDb.collection("gifts").where("to", "==", uid).where("read", "==", false).get()
+    .then(function(snap) {
+      var gifts = [];
+      snap.forEach(function(d) { gifts.push(Object.assign({ id: d.id }, d.data())); });
+      return gifts;
+    }).catch(function() { return []; });
+}
+function fbMarkGiftRead(giftId) {
+  if (!fbAvailable || !fbDb || !giftId) return;
+  fbDb.collection("gifts").doc(giftId).update({ read: true }).catch(function(){});
+}
+function fbGetGiftLog(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve([]);
+  var sent = fbDb.collection("gifts").where("from", "==", uid).orderBy("timestamp", "desc").limit(10).get();
+  var recv = fbDb.collection("gifts").where("to", "==", uid).orderBy("timestamp", "desc").limit(10).get();
+  return Promise.all([sent, recv]).then(function(results) {
+    var all = [];
+    results[0].forEach(function(d) { all.push(Object.assign({ id: d.id, dir: "sent" }, d.data())); });
+    results[1].forEach(function(d) { all.push(Object.assign({ id: d.id, dir: "received" }, d.data())); });
+    all.sort(function(a, b) { return (b.timestamp && b.timestamp.seconds || 0) - (a.timestamp && a.timestamp.seconds || 0); });
+    return all.slice(0, 10);
+  }).catch(function() { return []; });
+}
+
+/* ═══ CHALLENGES (Feature 5) ═══════════════════════════════════ */
+function fbSendChallenge(fromUid, toUid, gameId, fromUsername) {
+  if (!fbAvailable || !fbDb) return Promise.reject("No Firebase");
+  return fbDb.collection("challenges").add({
+    from: fromUid, to: toUid, game: gameId,
+    fromUsername: fromUsername || "Player",
+    fromScore: null, toScore: null,
+    status: "pending", /* pending, active, complete, expired */
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000)
+  });
+}
+function fbGetChallenges(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve([]);
+  var q1 = fbDb.collection("challenges").where("from", "==", uid).get();
+  var q2 = fbDb.collection("challenges").where("to", "==", uid).get();
+  return Promise.all([q1, q2]).then(function(results) {
+    var all = [];
+    results[0].forEach(function(d) { all.push(Object.assign({ id: d.id }, d.data())); });
+    results[1].forEach(function(d) { all.push(Object.assign({ id: d.id }, d.data())); });
+    /* Dedupe */
+    var seen = {};
+    return all.filter(function(c) { if (seen[c.id]) return false; seen[c.id] = true; return true; });
+  }).catch(function() { return []; });
+}
+function fbUpdateChallengeScore(challengeId, uid, score) {
+  if (!fbAvailable || !fbDb) return;
+  fbDb.collection("challenges").doc(challengeId).get().then(function(snap) {
+    if (!snap.exists) return;
+    var data = snap.data();
+    var updates = {};
+    if (data.from === uid) updates.fromScore = Math.max(data.fromScore || 0, score);
+    if (data.to === uid) updates.toScore = Math.max(data.toScore || 0, score);
+    if (data.status === "pending") updates.status = "active";
+    fbDb.collection("challenges").doc(challengeId).update(updates).catch(function(){});
+  }).catch(function(){});
+}
+function checkExpiredChallenges(challenges) {
+  var now = Date.now();
+  challenges.forEach(function(c) {
+    if (c.status !== "pending" && c.status !== "active") return;
+    var expires = c.expiresAt && c.expiresAt.toDate ? c.expiresAt.toDate().getTime() : (c.expiresAt || 0);
+    if (now > expires) {
+      if (fbAvailable && fbDb) {
+        fbDb.collection("challenges").doc(c.id).update({ status: "expired" }).catch(function(){});
+      }
+    }
+  });
+}
+
+/* ═══ NOTIFICATION HELPERS (Feature 10) ════════════════════════════ */
+function getNotifPrefs() {
+  try { var raw = localStorage.getItem("fluxNotifPrefs"); if (raw) return JSON.parse(raw); } catch(e) {}
+  return { enabled: true, streakReminders: true, gifts: true, challenges: true };
+}
+function saveNotifPrefs(prefs) {
+  try { localStorage.setItem("fluxNotifPrefs", JSON.stringify(prefs)); } catch(e) {}
+}
+function showLocalNotification(title, body) {
+  try {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+    if (!document.hidden) return; /* Only show if app is backgrounded */
+    new Notification(title, { body: body, icon: "icon-192.png" });
+  } catch(e) {}
 }
 
 /* ═══ NETWORK MONITOR ═══════════════════════════════════════════ */
@@ -12746,6 +12978,76 @@ function FeedbackPopup({
     }
   }, "Cancel")));
 }
+
+/* ═══ LEADERBOARD PANEL COMPONENT ═══════════════════════════════ */
+function LeaderboardPanel({ onClose, fbUser, friendsList, lifetimeXp, username, avatar }) {
+  var [tab, setTab] = useState("global");
+  var [selectedGame, setSelectedGame] = useState("blackjack");
+  var [scores, setScores] = useState([]);
+  var [loading, setLoading] = useState(false);
+  var [myRank, setMyRank] = useState(null);
+  useEffect(function() {
+    setLoading(true);
+    fbGetLeaderboard(selectedGame).then(function(data) {
+      setScores(data);
+      if (fbUser) {
+        var idx = data.findIndex(function(s) { return s.uid === fbUser.uid; });
+        setMyRank(idx >= 0 ? idx + 1 : null);
+      }
+      setLoading(false);
+    });
+  }, [selectedGame]);
+  var displayScores = tab === "friends" ? scores.filter(function(s) {
+    return friendsList.some(function(f) { return f.uid === s.uid; }) || (fbUser && s.uid === fbUser.uid);
+  }) : scores;
+  if (!fbUser) return /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" },
+    onClick: function(e) { if (e.target === e.currentTarget) onClose(); }
+  }, /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "90%", maxWidth: 380, textAlign: "center", animation: "fadeUp 0.25s" } },
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 36, marginBottom: 12 } }, "\uD83D\uDD12"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: "var(--dim)", marginBottom: 16 } }, "Sign in to view leaderboards"),
+    /*#__PURE__*/React.createElement("button", { onClick: onClose, style: { padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none" } }, "Close")));
+  var gameNames = { blackjack: "Blackjack", highlow: "Higher/Lower", slots: "Slots", ladder: "Coin Ladder", mines: "Mines", plinko: "Plinko", crash: "Crash", dice: "Dice", keno: "Keno", tower: "Tower", coinflip: "Coin Flip", roulette: "Roulette", bomb: "Bomb Defuser", stocks: "Stocks" };
+  return /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" },
+    onClick: function(e) { if (e.target === e.currentTarget) onClose(); }
+  }, /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 20, width: "94%", maxWidth: 420, maxHeight: "90vh", overflow: "auto", animation: "fadeUp 0.25s" } },
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
+      /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\uD83C\uDFC6 Leaderboards"),
+      /*#__PURE__*/React.createElement("button", { onClick: onClose, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")),
+    /* Game selector */
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 } },
+      Object.keys(gameNames).map(function(gid) {
+        return /*#__PURE__*/React.createElement("button", { key: gid, onClick: function() { setSelectedGame(gid); },
+          style: { padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: selectedGame === gid ? "linear-gradient(135deg,#c084fc,#818cf8)" : "var(--surface2)", color: selectedGame === gid ? "#fff" : "var(--dim)", border: selectedGame === gid ? "none" : "1px solid var(--border)" }
+        }, gameNames[gid]);
+      })),
+    /* Tabs */
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } },
+      ["global", "friends"].map(function(t) {
+        return /*#__PURE__*/React.createElement("button", { key: t, onClick: function() { setTab(t); },
+          style: { flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 12, fontWeight: 700, background: tab === t ? "rgba(192,132,252,0.15)" : "var(--surface2)", color: tab === t ? "var(--neon)" : "var(--dim)", border: tab === t ? "1px solid rgba(192,132,252,0.3)" : "1px solid var(--border)", textTransform: "capitalize" }
+        }, t);
+      })),
+    /* Scores list */
+    loading ? /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 20, color: "var(--dim)" } }, "\u23F3 Loading...") :
+    displayScores.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 20, color: "var(--dim)", fontSize: 12 } }, "No scores yet. Play to get on the board!") :
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+      displayScores.map(function(s, i) {
+        var isMe = fbUser && s.uid === fbUser.uid;
+        return /*#__PURE__*/React.createElement("div", { key: s.uid, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: isMe ? "rgba(192,132,252,0.1)" : "var(--surface2)", borderRadius: 8, border: isMe ? "1px solid rgba(192,132,252,0.3)" : "1px solid var(--border)" } },
+          /*#__PURE__*/React.createElement("div", { style: { width: 24, fontSize: 12, fontWeight: 800, color: i < 3 ? "var(--neon)" : "var(--dim)", textAlign: "center", fontFamily: "'JetBrains Mono',monospace" } }, "#" + (i + 1)),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 18 } }, s.avatar || "\uD83D\uDC64"),
+          /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, s.username || "Player"),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)" } }, s.tier || "Bronze")),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 800, color: "var(--green)", fontFamily: "'JetBrains Mono',monospace" } }, "+" + (s.score || 0)));
+      })),
+    /* Own rank if not in top 100 */
+    myRank === null && fbUser && /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, padding: "8px 10px", background: "rgba(192,132,252,0.08)", borderRadius: 8, border: "1px solid rgba(192,132,252,0.2)", fontSize: 11, color: "var(--dim)", textAlign: "center" } }, "Your rank: outside top 100. Keep playing to climb!")
+  ));
+}
+
 function HelpPage({
   onClose
 }) {
@@ -13895,6 +14197,18 @@ function FluxApp() {
   const [savingName, setSavingName] = useState(false);
   const [showLookSound, setShowLookSound] = useState(false);
   const [showLookSoundPanel, setShowLookSoundPanel] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [giftTarget, setGiftTarget] = useState(null);
+  const [giftAmount, setGiftAmount] = useState("");
+  const [giftMsg, setGiftMsg] = useState(null);
+  const [giftLog, setGiftLog] = useState([]);
+  const [challenges, setChallenges] = useState([]);
+  const [challengeTarget, setChallengeTarget] = useState(null);
+  const [challengeGame, setChallengeGame] = useState("blackjack");
+  const [betHistoryLog, setBetHistoryLog] = useState([]);
+  const [notifPrefs, setNotifPrefs] = useState(getNotifPrefs());
+  const [lifetimeXp, setLifetimeXp] = useState(save.lifetimeXp || save.xp || 0);
+  const [perGameWins, setPerGameWins] = useState(save.perGameWins || {});
   const [showCustomize, setShowCustomize] = useState(false);
   const [clickParticles, setClickParticles] = useState([]);
   const [lossToast, setLossToast] = useState(null);
@@ -14200,6 +14514,42 @@ function FluxApp() {
     try {
       if (xpChange > 0) playSound("xpGain");else if (xpChange < 0) playSound("xpLose");
     } catch (e) {}
+
+    /* Feature 9: Analytics */
+    try { logAnalytics("bet_placed", { game: event.game, bet: event.bet, result: evT }); } catch(e) {}
+    /* Feature 3: Lifetime XP tracking */
+    setLifetimeXp(function(lxp) {
+      var newLxp = lxp + Math.max(0, xpChange);
+      var oldTier = getTier(lxp);
+      var newTierObj = getTier(newLxp);
+      if (newTierObj.name !== oldTier.name) {
+        try { logAnalytics("tier_up", { newTier: newTierObj.name }); } catch(e) {}
+      }
+      return newLxp;
+    });
+    /* Feature 1: Leaderboard update */
+    if (event.type === "win" && event.profit > 0 && fbUser) {
+      setPerGameWins(function(pgw) {
+        var updated = Object.assign({}, pgw);
+        updated[event.game] = (updated[event.game] || 0) + event.profit;
+        try { fbUpdateLeaderboard(event.game, fbUser.uid, { username: username, avatar: avatar, lifetimeXp: lifetimeXp, score: updated[event.game] }); } catch(e) {}
+        return updated;
+      });
+    }
+    /* Feature 4: Bet history */
+    setBetHistoryLog(function(h) {
+      return [{ game: event.game, bet: event.bet || 0, result: evT, profit: event.profit || 0, time: Date.now() }].concat(h).slice(0, 200);
+    });
+    /* Feature 5: Update active challenges */
+    if (fbUser && event.type === "win") {
+      challenges.forEach(function(ch) {
+        if ((ch.status === "pending" || ch.status === "active") && ch.game === event.game) {
+          if (ch.from === fbUser.uid || ch.to === fbUser.uid) {
+            try { fbUpdateChallengeScore(ch.id, fbUser.uid, event.profit || 0); } catch(e) {}
+          }
+        }
+      });
+    }
     /* Golden particles on big wins */
     if (event.profit && event.profit >= 50) {
       setWinParticles(true);
@@ -14592,6 +14942,7 @@ function FluxApp() {
       if (done || !minShown || !loaded) return;
       done = true;
       setSplash("done");
+      try { logAnalytics("app_opened", {}); } catch(e) {}
       setHubPhase("logo");
       setTimeout(function () {
         setHubPhase("cards");
@@ -14922,6 +15273,7 @@ function FluxApp() {
       game: g,
       onClick: function () {
         setGame(g.id);
+        try { logAnalytics("game_opened", { game: g.id }); } catch(e) {}
       },
       animDelay: i * 100,
       isWide: isWide,
@@ -14963,7 +15315,30 @@ function FluxApp() {
       pointerEvents: showSettings ? "none" : "auto",
       transition: "opacity 0.2s"
     }
-  }, "\u2699\uFE0F"), splash === "done" && !showSettings && username && /*#__PURE__*/React.createElement("button", {
+  }, "\u2699\uFE0F"), splash === "done" && /*#__PURE__*/React.createElement("button", {
+    onClick: function () { setShowLeaderboard(true); },
+    style: {
+      position: "fixed",
+      bottom: isWide ? 22 : 18,
+      right: isWide ? 80 : 70,
+      width: isWide ? 50 : 44,
+      height: isWide ? 50 : 44,
+      borderRadius: "50%",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: isWide ? 22 : 20,
+      color: "var(--dim)",
+      zIndex: 699,
+      backdropFilter: "blur(8px)",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+      opacity: showSettings || showLeaderboard ? 0 : 0.6,
+      pointerEvents: showSettings || showLeaderboard ? "none" : "auto",
+      transition: "opacity 0.2s"
+    }
+  }, "������"), splash === "done" && !showSettings && username && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowProfile(true);
     },
@@ -15031,7 +15406,7 @@ function FluxApp() {
       fontStyle: "italic",
       color: "var(--text)"
     }
-  }, avatar + " " + (username || "Player")), /*#__PURE__*/React.createElement("button", {
+  }, avatar + " " + (username || "Player")), /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: getTier(lifetimeXp).color, fontWeight: 700, marginTop: 2 } }, getTier(lifetimeXp).icon + " " + getTier(lifetimeXp).name + " Tier"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowProfile(false);
     },
@@ -15489,6 +15864,20 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Syncs less often to save data." + (netInfo.type !== "unknown" ? " Network: " + netInfo.type + (netInfo.online ? "" : " (offline)") : ""))),
     /*#__PURE__*/React.createElement("button", { onClick: function () { setDataSaver(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: dataSaver ? "var(--green)" : "var(--surface)", border: dataSaver ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
     /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: dataSaver ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+  
+  /* Notifications toggle */
+  /*#__PURE__*/React.createElement("div", {
+    style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDD14"),
+    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Notifications")),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, typeof Notification !== "undefined" && Notification.permission === "denied" ? "Blocked in browser settings" : "Gifts, challenges, streaks")),
+    /*#__PURE__*/React.createElement("button", { onClick: function () {
+      var np = Object.assign({}, notifPrefs, { enabled: !notifPrefs.enabled });
+      setNotifPrefs(np); saveNotifPrefs(np);
+      if (np.enabled && typeof Notification !== "undefined" && Notification.permission === "default") { try { Notification.requestPermission(); } catch(e) {} }
+    }, style: { width: 48, height: 28, borderRadius: 14, background: notifPrefs.enabled ? "var(--green)" : "var(--surface)", border: notifPrefs.enabled ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+    /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: notifPrefs.enabled ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
   /* Look & Sound sub-panel button */
   /*#__PURE__*/React.createElement("button", {
     onClick: function () { setShowLookSoundPanel(true); },
@@ -16181,7 +16570,57 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: quickPlay ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", marginTop: 8 } },
       /*#__PURE__*/React.createElement("button", { onClick: function () { setShowCustomize(false); }, style: { padding: "10px 32px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "2px solid #8b5cf6" } }, "Done"))),
-  ), showInfo && /*#__PURE__*/React.createElement(InfoPanel, {
+  ), showLeaderboard && /*#__PURE__*/React.createElement(LeaderboardPanel, {
+    onClose: function() { setShowLeaderboard(false); },
+    fbUser: fbUser, friendsList: friendsList, lifetimeXp: lifetimeXp, username: username, avatar: avatar
+  }),
+  /* Gift Modal */
+  giftTarget && /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" },
+    onClick: function(e) { if (e.target === e.currentTarget) setGiftTarget(null); }
+  }, /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "85%", maxWidth: 320, animation: "fadeUp 0.25s", textAlign: "center" } },
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "������"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 } }, "Send FluxBucks to " + (giftTarget.username || "Player")),
+    /*#__PURE__*/React.createElement("input", { type: "number", value: giftAmount, onChange: function(e) { setGiftAmount(e.target.value); }, placeholder: "Amount (min 100)", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 14, fontFamily: "'JetBrains Mono',monospace", marginBottom: 8, textAlign: "center" } }),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 12 } }, "Max: " + Math.min(Math.floor(chips * 0.1), 100000)),
+    giftMsg && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: giftMsg.ok ? "var(--green)" : "var(--accent)", marginBottom: 8 } }, giftMsg.text),
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8 } },
+      /*#__PURE__*/React.createElement("button", { onClick: function() { setGiftTarget(null); }, style: { flex: 1, padding: "10px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)" } }, "Cancel"),
+      /*#__PURE__*/React.createElement("button", { onClick: function() {
+        var amt = parseInt(giftAmount);
+        var maxGift = Math.min(Math.floor(chips * 0.1), 100000);
+        if (!amt || amt < 100) { setGiftMsg({ ok: false, text: "Minimum 100 FluxBucks" }); return; }
+        if (amt > maxGift) { setGiftMsg({ ok: false, text: "Max " + maxGift }); return; }
+        if (!fbUser) { setGiftMsg({ ok: false, text: "Sign in first" }); return; }
+        fbSendGift(fbUser.uid, giftTarget.uid, amt, username).then(function() {
+          setChips(function(c) { return c - amt; });
+          setGiftMsg({ ok: true, text: "Sent " + amt + " FluxBucks!" });
+          setTimeout(function() { setGiftTarget(null); }, 1500);
+        }).catch(function() { setGiftMsg({ ok: false, text: "Failed to send" }); });
+      }, style: { flex: 1, padding: "10px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none" } }, "Send"))
+  )),
+  /* Challenge Modal */
+  challengeTarget && /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" },
+    onClick: function(e) { if (e.target === e.currentTarget) setChallengeTarget(null); }
+  }, /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "85%", maxWidth: 320, animation: "fadeUp 0.25s", textAlign: "center" } },
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "⚔️"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 } }, "Challenge " + (challengeTarget.username || "Player")),
+    /*#__PURE__*/React.createElement("select", { value: challengeGame, onChange: function(e) { setChallengeGame(e.target.value); }, style: { width: "100%", padding: "10px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, marginBottom: 12 } },
+      GAMES.filter(function(g) { return !g.safeOnly; }).map(function(g) {
+        return /*#__PURE__*/React.createElement("option", { key: g.id, value: g.id }, g.name);
+      })),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 12 } }, "48 hours to play. Highest net win takes +500 FluxBucks!"),
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8 } },
+      /*#__PURE__*/React.createElement("button", { onClick: function() { setChallengeTarget(null); }, style: { flex: 1, padding: "10px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)" } }, "Cancel"),
+      /*#__PURE__*/React.createElement("button", { onClick: function() {
+        if (!fbUser) return;
+        fbSendChallenge(fbUser.uid, challengeTarget.uid, challengeGame, username).then(function() {
+          setChallengeTarget(null);
+        }).catch(function(){});
+      }, style: { flex: 1, padding: "10px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "linear-gradient(135deg,#56c1ff,#818cf8)", color: "#fff", border: "none" } }, "Send Challenge"))
+  )),
+  showInfo && /*#__PURE__*/React.createElement(InfoPanel, {
     onClose: function () {
       setShowInfo(false);
     }
@@ -16481,7 +16920,7 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", marginBottom: 16 } },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 48, marginBottom: 8 } }, viewingFriend.avatar || "\uD83D\uDC64"),
       /*#__PURE__*/React.createElement("div", { style: { fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, viewingFriend.username || "Player"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--dim)", marginTop: 4 } }, "Level " + (viewingFriend.level || 1))
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--dim)", marginTop: 4 } }, "Level " + (viewingFriend.level || 1) + " · " + getTier(viewingFriend.xp || 0).name)
     ),
     /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
       [
