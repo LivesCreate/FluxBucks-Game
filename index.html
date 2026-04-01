@@ -26,7 +26,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.9.0";
+const VERSION = "v4.9.2";
 try { if (typeof firebase !== "undefined") initErrorLogging(); } catch(e) {}
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
@@ -2469,8 +2469,8 @@ function Starfield() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     const dpr = window.devicePixelRatio || 1;
-    let W = window.innerWidth + 100;
-    let H = window.innerHeight + 100;
+    let W = window.innerWidth;
+    let H = window.innerHeight;
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     canvas.style.width = W + "px";
@@ -2968,8 +2968,8 @@ function Starfield() {
     }
     draw();
     const handleResize = () => {
-      W = window.innerWidth + 100;
-      H = window.innerHeight + 100;
+      W = window.innerWidth;
+      H = window.innerHeight;
       const dpr2 = window.devicePixelRatio || 1;
       canvas.width = W * dpr2;
       canvas.height = H * dpr2;
@@ -2998,11 +2998,11 @@ function Starfield() {
   return /*#__PURE__*/React.createElement("canvas", {
     ref: canvasRef,
     style: {
-      position: "absolute",
+      position: "fixed",
       top: 0,
       left: 0,
-      width: "100%",
-      height: "100%",
+      width: "100vw",
+      height: "100vh",
       zIndex: 0,
       pointerEvents: "none"
     }
@@ -5381,16 +5381,10 @@ function Plinko({
     const ctx = c.getContext("2d");
     const W = c.width;
     const H = c.height;
-    let col = 0;
-    const path = [];
-    for (let row = 0; row < ROWS; row++) {
-      col += Math.random() < 0.5 ? 0 : 1;
-      path.push({
-        row,
-        col
-      });
-    }
-    const finalSlot = col;
+    /* Feature 7: Physics via Web Worker with fallback */
+    var simResult = await plinkoSim(ROWS);
+    var path = simResult.path;
+    const finalSlot = simResult.finalSlot;
     let bx = W / 2,
       by = 8;
     for (let i = 0; i < path.length; i++) {
@@ -13292,6 +13286,65 @@ function InfoPanel({
     }
   }, "Close"))));
 }
+
+/* ═══ LAZY GAME LOADING SYSTEM (Feature 6) ═══════════════════════ */
+var _gameRegistry = {};
+function registerGame(id, component) { _gameRegistry[id] = component; }
+function GameLoader({ gameId, gameProps, extraProps }) {
+  var [loaded, setLoaded] = useState(false);
+  var Component = _gameRegistry[gameId];
+  useEffect(function() {
+    /* Small delay to allow loading indicator to show, then render game */
+    var t = setTimeout(function() { setLoaded(true); }, 50);
+    return function() { clearTimeout(t); };
+  }, [gameId]);
+  if (!Component) return /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", padding: 40, color: "var(--dim)" } }, "Game not found");
+  if (!loaded) return /*#__PURE__*/React.createElement("div", { style: { position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)", zIndex: 50 } },
+    /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 36, marginBottom: 12, animation: "popBounce 0.6s ease" } }, "\uD83C\uDFB2"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: "var(--dim)", fontWeight: 600 } }, "Loading game...")));
+  var props = extraProps ? Object.assign({}, gameProps, extraProps) : gameProps;
+  return /*#__PURE__*/React.createElement(Component, props);
+}
+
+/* ═══ PLINKO WEB WORKER (Feature 7) ══════════════════════════════ */
+var _plinkoWorker = null;
+function getPlinkoWorker() {
+  if (_plinkoWorker) return _plinkoWorker;
+  try {
+    var code = 'self.onmessage=function(e){var d=e.data;if(d.type==="PLINKO_DROP"){var rows=d.rows||12;var col=0;var path=[];for(var r=0;r<rows;r++){col+=Math.random()<0.5?0:1;path.push({row:r,col:col});}self.postMessage({type:"PLINKO_RESULT",path:path,finalSlot:col});}};';
+    var blob = new Blob([code], { type: "application/javascript" });
+    _plinkoWorker = new Worker(URL.createObjectURL(blob));
+    return _plinkoWorker;
+  } catch(e) {
+    return null;
+  }
+}
+function plinkoSimFallback(rows) {
+  var col = 0;
+  var path = [];
+  for (var r = 0; r < rows; r++) {
+    col += Math.random() < 0.5 ? 0 : 1;
+    path.push({ row: r, col: col });
+  }
+  return { path: path, finalSlot: col };
+}
+function plinkoSim(rows) {
+  return new Promise(function(resolve) {
+    var worker = getPlinkoWorker();
+    if (!worker) { resolve(plinkoSimFallback(rows)); return; }
+    var timeout = setTimeout(function() { resolve(plinkoSimFallback(rows)); }, 2000);
+    worker.onmessage = function(e) {
+      if (e.data.type === "PLINKO_RESULT") {
+        clearTimeout(timeout);
+        resolve({ path: e.data.path, finalSlot: e.data.finalSlot });
+      }
+    };
+    worker.onerror = function() { clearTimeout(timeout); resolve(plinkoSimFallback(rows)); };
+    worker.postMessage({ type: "PLINKO_DROP", rows: rows });
+  });
+}
+
 const GAMES = [{
   id: "blackjack",
   name: "Blackjack",
@@ -14146,6 +14199,38 @@ function AFKPopup({
     }
   }, "Yes, I'm here!")));
 }
+
+/* Register all games for lazy loading */
+registerGame("blackjack", Blackjack);
+registerGame("highlow", HigherLower);
+registerGame("slots", Slots);
+registerGame("ladder", CoinLadder);
+registerGame("memory", MemoryMatch);
+registerGame("mines", Mines);
+registerGame("plinko", Plinko);
+registerGame("limbo", Limbo);
+registerGame("dice", Dice);
+registerGame("reaction", ReactionTest);
+registerGame("colormatch", ColorMatchGame);
+registerGame("mathrush", MathRush);
+registerGame("emojihunt", EmojiHunt);
+registerGame("sequence", SequenceMemory);
+registerGame("wordscramble", WordScramble);
+registerGame("aimtrainer", AimTrainer);
+registerGame("typingspeed", TypingSpeed);
+registerGame("keno", Keno);
+registerGame("crash", Crash);
+registerGame("tower", Tower);
+registerGame("coinflip", CoinFlip);
+registerGame("videopoker", VideoPoker);
+registerGame("baccarat", Baccarat);
+registerGame("chicken", Chicken);
+registerGame("packs", Packs);
+registerGame("scarab", Scarab);
+registerGame("roulette", RussianRoulette);
+registerGame("stocks", StockTrader);
+registerGame("bomb", BombDefuser);
+
 function FluxApp() {
   var save = loadSave();
   const [chips, setChips] = useState(save.chips);
@@ -14965,38 +15050,12 @@ function FluxApp() {
     trackResult,
     forceWin
   };
-  if (game === "blackjack") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Blackjack, gp));
-  if (game === "highlow") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(HigherLower, gp));
-  if (game === "slots") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Slots, gp));
-  if (game === "ladder") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(CoinLadder, gp));
-  if (game === "memory") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(MemoryMatch, gp));
-  if (game === "mines") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Mines, gp));
-  if (game === "plinko") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Plinko, gp));
-  if (game === "limbo") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Limbo, gp));
-  if (game === "dice") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Dice, gp));
-  if (game === "reaction") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(ReactionTest, gp));
-  if (game === "colormatch") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(ColorMatchGame, gp));
-  if (game === "mathrush") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(MathRush, gp));
-  if (game === "emojihunt") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(EmojiHunt, gp));
-  if (game === "sequence") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(SequenceMemory, gp));
-  if (game === "wordscramble") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(WordScramble, gp));
-  if (game === "aimtrainer") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(AimTrainer, gp));
-  if (game === "typingspeed") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(TypingSpeed, gp));
-  if (game === "keno") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Keno, gp));
-  if (game === "crash") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Crash, gp));
-  if (game === "tower") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Tower, gp));
-  if (game === "coinflip") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(CoinFlip, gp));
-  if (game === "videopoker") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(VideoPoker, gp));
-  if (game === "baccarat") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Baccarat, gp));
-  if (game === "chicken") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Chicken, gp));
-  if (game === "packs") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Packs, _extends({}, gp, {
-    collection: collection,
-    setCollection: setCollection
-  })));
-  if (game === "scarab") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(Scarab, gp));
-  if (game === "roulette") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(RussianRoulette, gp));
-  if (game === "stocks") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(StockTrader, gp));
-  if (game === "bomb") return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(BombDefuser, gp));
+  /* Feature 6: Lazy game loading via registry */
+  if (game && _gameRegistry[game]) {
+    var _extraProps = null;
+    if (game === "packs") _extraProps = { collection: collection, setCollection: setCollection };
+    return /*#__PURE__*/React.createElement(Wrap, null, /*#__PURE__*/React.createElement(GameLoader, { gameId: game, gameProps: gp, extraProps: _extraProps }));
+  }
   return /*#__PURE__*/React.createElement(Wrap, null, splash !== "done" && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -15778,83 +15837,22 @@ function FluxApp() {
       boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
     }
   }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "14px 16px",
-      background: "var(--surface2)",
-      borderRadius: 12,
-      border: "1px solid var(--border)",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "👤"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "var(--text)"
-    }
-  }, "Username")), /*#__PURE__*/React.createElement("div", {
-    style: { display: "flex", gap: 6, alignItems: "center" }
-  }, /*#__PURE__*/React.createElement("input", {
-    value: editUsername,
-    onChange: function (e) {
-      setEditUsername(e.target.value.slice(0, 30));
-    },
-    placeholder: "Enter a name...",
-    spellCheck: false,
-    autoCorrect: "off",
-    autoCapitalize: "off",
-    style: {
-      flex: 1,
-      minWidth: 0,
-      padding: "8px 12px",
-      borderRadius: 8,
-      background: "var(--surface)",
-      border: "1px solid var(--border)",
-      color: "var(--text)",
-      fontSize: 14,
-      fontFamily: "'JetBrains Mono',monospace"
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      if (savingName) return;
-      setSavingName(true);
-      setUsername(editUsername);
-      setTimeout(function () { setSavingName(false); }, 1800);
-    },
-    disabled: savingName,
-    style: {
-      width: 36,
-      height: 36,
-      borderRadius: 8,
-      fontSize: 16,
-      fontWeight: 700,
-      background: savingName ? "rgba(74,222,128,0.15)" : "var(--surface)",
-      color: savingName ? "var(--green)" : "var(--dim)",
-      border: savingName ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
-      transition: "all 0.3s",
-      padding: 0
-    }
-  }, savingName ? /*#__PURE__*/React.createElement("span", { style: { display: "inline-block", animation: "starRotate 1s linear infinite", fontSize: 14 } }, "\u23F3") : "\u2714")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: "var(--dim)",
-      marginTop: 4
-    }
-  }, editUsername.length + "/30 · Shows on stats & share cards")),
+    style: { display: "flex", gap: 6, alignItems: "center", padding: "8px 10px", background: "var(--surface2)", borderRadius: 10, border: "1px solid var(--border)", marginBottom: 8 }
+  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 14, flexShrink: 0 } }, "������"),
+    /*#__PURE__*/React.createElement("div", { style: { flex: 1, position: "relative", minWidth: 0 } },
+      /*#__PURE__*/React.createElement("input", {
+        value: editUsername,
+        onChange: function (e) { setEditUsername(e.target.value.slice(0, 30)); },
+        placeholder: "Set username...",
+        spellCheck: false, autoCorrect: "off", autoCapitalize: "off",
+        style: { width: "100%", padding: "6px 40px 6px 10px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, fontFamily: "'JetBrains Mono',monospace" }
+      }),
+      /*#__PURE__*/React.createElement("span", { style: { position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 9, color: "var(--dim)", pointerEvents: "none" } }, editUsername.length + "/30")),
+    /*#__PURE__*/React.createElement("button", {
+      onClick: function () { if (savingName) return; setSavingName(true); setUsername(editUsername); setTimeout(function () { setSavingName(false); }, 1800); },
+      disabled: savingName,
+      style: { width: 32, height: 32, borderRadius: 8, fontSize: 14, fontWeight: 700, background: savingName ? "rgba(74,222,128,0.15)" : "var(--surface)", color: savingName ? "var(--green)" : "var(--dim)", border: savingName ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.3s", padding: 0 }
+    }, savingName ? /*#__PURE__*/React.createElement("span", { style: { display: "inline-block", animation: "starRotate 1s linear infinite", fontSize: 12 } }, "⏳") : "✔")),
   /* Data Saver — moved to main settings */
   /*#__PURE__*/React.createElement("div", {
     style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }
@@ -15918,107 +15916,16 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\u2699\uFE0F"),
     /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14 } }, "Customize")),
     /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--dim)" } }, "\u203A")),
-  /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 8,
-      marginTop: 14
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setShowAccount(true);
-    },
-    style: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      fontSize: 12,
-      fontWeight: 700,
-      background: fbUser ? "rgba(74,222,128,0.1)" : "var(--surface2)",
-      color: fbUser ? "var(--green)" : "var(--dim)",
-      border: fbUser ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border)",
-      textAlign: "center"
-    }
-  }, fbUser ? "\uD83D\uDD12 Account" : "\uD83D\uDD13 Sign In"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      if (!fbUser) { setShowAccount(true); return; }
-      setShowFriends(true);
-      doLoadFriends();
-    },
-    style: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      fontSize: 12,
-      fontWeight: 700,
-      background: "var(--surface2)",
-      color: fbUser ? "var(--cool)" : "var(--dim)",
-      border: fbUser ? "1px solid rgba(86,193,255,0.3)" : "1px solid var(--border)",
-      textAlign: "center",
-      opacity: fbUser ? 1 : 0.5
-    }
-  }, "\uD83D\uDC65 Friends"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setUsername(editUsername);
-      setShowChangelog(true);
-      setShowSettings(false);
-    },
-    style: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      fontSize: 12,
-      fontWeight: 700,
-      background: "var(--surface2)",
-      color: "var(--neon)",
-      border: "1px solid rgba(192,132,252,0.3)",
-      textAlign: "center"
-    }
-  }, "\uD83D\uDCCB What's New"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setShowFeedback(true);
-    },
-    style: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      fontSize: 12,
-      fontWeight: 700,
-      background: "var(--surface2)",
-      color: "var(--green)",
-      border: "1px solid rgba(74,222,128,0.3)",
-      textAlign: "center"
-    }
-  }, "\uD83D\uDCAC Feedback"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setUsername(editUsername);
-      setShowInfo(true);
-      setShowSettings(false);
-    },
-    style: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      fontSize: 12,
-      fontWeight: 700,
-      background: "var(--surface2)",
-      color: "var(--dim)",
-      border: "1px solid var(--border)",
-      textAlign: "center"
-    }
-  }, "\u2139\uFE0F About"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      setUsername(editUsername);
-      setShowHelp(true);
-      setShowSettings(false);
-    },
-    style: {
-      padding: "10px 12px",
-      borderRadius: 10,
-      fontSize: 12,
-      fontWeight: 700,
-      background: "var(--surface2)",
-      color: "var(--dim)",
-      border: "1px solid var(--border)",
-      textAlign: "center"
-    }
-  }, "\u2753 How To Play")),
+  /* Account + Friends */
+  /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 } },
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setShowAccount(true); }, style: { padding: "8px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: fbUser ? "rgba(74,222,128,0.1)" : "var(--surface2)", color: fbUser ? "var(--green)" : "var(--dim)", border: fbUser ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border)", textAlign: "center" } }, fbUser ? "������ Account" : "������ Sign In"),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { if (!fbUser) { setShowAccount(true); return; } setShowFriends(true); doLoadFriends(); }, style: { padding: "8px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "var(--surface2)", color: fbUser ? "var(--cool)" : "var(--dim)", border: fbUser ? "1px solid rgba(86,193,255,0.3)" : "1px solid var(--border)", textAlign: "center", opacity: fbUser ? 1 : 0.5 } }, "������ Friends")),
+  /* Compact info 2x2 */
+  /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 6 } },
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setUsername(editUsername); setShowChangelog(true); setShowSettings(false); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--neon)", border: "1px solid rgba(192,132,252,0.2)", textAlign: "center" } }, "������ New"),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { window.open("https://docs.google.com/forms/d/e/1FAIpQLSfnhUo1RBMFcdKddQmv8--GTCiPOFEeXNLk0f18SzX2lOOSZQ/viewform", "_blank"); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--green)", border: "1px solid rgba(74,222,128,0.2)", textAlign: "center" } }, "������ Feedback"),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setUsername(editUsername); setShowInfo(true); setShowSettings(false); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)", textAlign: "center" } }, "ℹ️ About"),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setUsername(editUsername); setShowHelp(true); setShowSettings(false); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)", textAlign: "center" } }, "❓ Help")),
   /* Troubleshooting row */
   /*#__PURE__*/React.createElement("div", {
     style: {
@@ -16095,7 +16002,7 @@ function FluxApp() {
       border: "1px solid rgba(255,94,120,0.3)",
       textAlign: "center"
     }
-  }, "\uD83D\uDDD1 Reset")), /*#__PURE__*/React.createElement("div", {
+  }, "\u26A0\uFE0F Clear Data")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 10,
       textAlign: "center",
@@ -16139,14 +16046,14 @@ function FluxApp() {
       color: "var(--accent)",
       marginBottom: 8
     }
-  }, "Reset All Data?"), /*#__PURE__*/React.createElement("p", {
+  }, "Clear Save Data?"), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 13,
       color: "var(--dim)",
       lineHeight: 1.5,
       marginBottom: 20
     }
-  }, "This will permanently delete all saved data from your browser including chips, achievements, statistics, bet history, and settings. You will start fresh with 500 chips. This cannot be undone."), /*#__PURE__*/React.createElement("div", {
+  }, "This will permanently erase ALL your FluxBucks progress including chips, achievements, stats, and settings. You will start fresh with 500 chips. This cannot be undone."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10,
@@ -16176,7 +16083,7 @@ function FluxApp() {
       color: "#fff",
       border: "2px solid var(--accent)"
     }
-  }, "Yes, Reset"))), showToastPicker && /*#__PURE__*/React.createElement("div", {
+  }, "Confirm"))), showToastPicker && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center"
     }
@@ -16483,7 +16390,7 @@ function FluxApp() {
     }
   }, "Done"))),
   /* ═══ LOOK & SOUND SUB-PANEL ═══ */
-  showLookSoundPanel && /*#__PURE__*/React.createElement("div", { style: { animation: "fadeUp 0.2s" } },
+  showLookSoundPanel && /*#__PURE__*/React.createElement("div", { style: { animation: "fadeUp 0.2s", width: "100%" } },
     /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
       /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
         /*#__PURE__*/React.createElement("button", { onClick: function () { setShowLookSoundPanel(false); }, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2190"),
@@ -16542,7 +16449,7 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", marginTop: 8 } },
       /*#__PURE__*/React.createElement("button", { onClick: function () { setShowLookSoundPanel(false); }, style: { padding: "10px 32px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "2px solid #8b5cf6" } }, "Done"))),
   /* ═══ CUSTOMIZE SUB-PANEL ═══ */
-  showCustomize && /*#__PURE__*/React.createElement("div", { style: { animation: "fadeUp 0.2s" } },
+  showCustomize && /*#__PURE__*/React.createElement("div", { style: { animation: "fadeUp 0.2s", width: "100%" } },
     /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
       /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
         /*#__PURE__*/React.createElement("button", { onClick: function () { setShowCustomize(false); }, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2190"),

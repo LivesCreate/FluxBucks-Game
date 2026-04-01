@@ -1,9 +1,9 @@
 [
   {
-    "id": 6,
+    "id": 8,
     "type": "update",
-    "icon": "í ¼í¼Ÿ",
-    "title": "v4.9.0 â€” Leaderboards, Gifting & More",
-    "message": "The biggest FluxBucks update yet!\n\nâ€¢ í ¼í¿† Leaderboards â€” Compete globally or with friends across every game\nâ€¢ í ¼í¾ Gift FluxBucks â€” Send chips to friends directly\nâ€¢ âš”ï¸ Challenge a Friend â€” 48-hour head-to-head game challenges\nâ€¢ í ¼í¿… Tier System â€” Bronze through Master ranks based on lifetime XP\nâ€¢ í ½í´” Notifications â€” Get alerted for gifts, challenges, and streaks\nâ€¢ í ½í³ˆ Improved analytics and error logging under the hood\n\nHead to the hub and tap the trophy icon to see leaderboards!"
+    "icon": "âœ¨",
+    "title": "v4.9.2 â€” Cleaner Settings",
+    "message": "Settings panel redesigned for a more compact layout.\n\nâ€¢ Username field is now a single compact row with inline character count\nâ€¢ Info buttons compressed into a tight 2x2 grid\nâ€¢ Feedback opens the form directly\nâ€¢ Reset renamed to Clear Save Data with updated warning\nâ€¢ Overall settings panel is shorter and easier to navigate"
   }
 ]
