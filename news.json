@@ -1,9 +1,9 @@
 [
   {
-    "id": 8,
+    "id": 9,
     "type": "update",
-    "icon": "✨",
-    "title": "v4.9.2 — Cleaner Settings",
-    "message": "Settings panel redesigned for a more compact layout.\n\n• Username field is now a single compact row with inline character count\n• Info buttons compressed into a tight 2x2 grid\n• Feedback opens the form directly\n• Reset renamed to Clear Save Data with updated warning\n• Overall settings panel is shorter and easier to navigate"
+    "icon": "������",
+    "title": "v4.9.3 — Login & Polish",
+    "message": "Improved sign-in options and smoother settings.\n\n• Email/password sign-in and sign-up added\n• Guest mode — play without an account\n• Google sign-in uses redirect instead of popup\n• QR code for your friend code — easier adding\n• Username save button disabled when nothing changed\n• Cleaner backdrop blur on all overlays\n• Background scroll locked while settings are open\n• Various UI polish fixes"
   }
 ]
