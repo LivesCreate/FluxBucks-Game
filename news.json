@@ -1,9 +1,9 @@
 [
   {
-    "id": 9,
+    "id": 13,
     "type": "update",
-    "icon": "������",
-    "title": "v4.9.3 — Login & Polish",
-    "message": "Improved sign-in options and smoother settings.\n\n• Email/password sign-in and sign-up added\n• Guest mode — play without an account\n• Google sign-in uses redirect instead of popup\n• QR code for your friend code — easier adding\n• Username save button disabled when nothing changed\n• Cleaner backdrop blur on all overlays\n• Background scroll locked while settings are open\n• Various UI polish fixes"
+    "icon": "✨",
+    "title": "v5.0.1 — Cleanup",
+    "message": "Removed the discontinued popup. FluxBucks is alive and well!"
   }
 ]

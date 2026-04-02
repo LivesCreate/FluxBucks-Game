@@ -1,5 +1,6 @@
-var CACHE_NAME = 'flux-v4-9-3';
+var CACHE_NAME = 'flux-v5-0-1';
 var URLS_TO_CACHE = ['./', './index.html',
+  'https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
   'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap'

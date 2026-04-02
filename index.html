@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>FluxBucks</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#050508;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation}body{min-height:100vh;min-height:100dvh}</style>
+<script src="https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js" crossorigin="anonymous"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -26,9 +27,51 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v4.9.3";
+const VERSION = "v5.0.1";
 try { if (typeof firebase !== "undefined") { initErrorLogging(); handleRedirectResult(); } } catch(e) {}
+
+/* Sentry Error Monitoring */
+try {
+  if (typeof Sentry !== "undefined" && Sentry.init) {
+    Sentry.init({
+      dsn: "https://f3ee6f89f5a6d489c9a5d14f438bdeac@o4511147553652736.ingest.us.sentry.io/4511147563745280",
+      tracesSampleRate: 0.1,
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: 0.5,
+      release: VERSION,
+      environment: window.location.hostname === "localhost" ? "development" : "production",
+      beforeSend: function(event) {
+        if (!window._sentryCount) window._sentryCount = 0;
+        if (!window._sentryReset) { window._sentryReset = setInterval(function() { window._sentryCount = 0; }, 60000); }
+        window._sentryCount++;
+        if (window._sentryCount > 10) return null;
+        return event;
+      }
+    });
+    Sentry.setTag("app", "fluxbucks");
+    console.log("Sentry initialized");
+  }
+} catch(e) { console.warn("Sentry init skipped:", e.message); }
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
+
+/* ═══ DEVELOPER CONSOLE ═══════════════════════════════════════════ */
+var _devLogs = [];
+var _devLogMax = 200;
+var _origConsoleLog = console.log;
+var _origConsoleWarn = console.warn;
+var _origConsoleError = console.error;
+function _devLog(level, args) {
+  var msg = Array.prototype.slice.call(args).map(function(a) {
+    try { return typeof a === "object" ? JSON.stringify(a).slice(0, 200) : String(a); }
+    catch(e) { return String(a); }
+  }).join(" ");
+  _devLogs.push({ t: Date.now(), level: level, msg: msg });
+  if (_devLogs.length > _devLogMax) _devLogs.shift();
+}
+console.log = function() { _devLog("log", arguments); _origConsoleLog.apply(console, arguments); };
+console.warn = function() { _devLog("warn", arguments); _origConsoleWarn.apply(console, arguments); };
+console.error = function() { _devLog("error", arguments); _origConsoleError.apply(console, arguments); };
+window.addEventListener("error", function(e) { _devLog("error", ["RUNTIME: " + (e.message || "") + " at " + (e.filename || "") + ":" + (e.lineno || "")]); });
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -117,6 +160,7 @@ const CSS = `
 @keyframes popIn{0%{opacity:0;transform:scale(0.6)}70%{transform:scale(1.08)}100%{opacity:1;transform:scale(1)}}
 @keyframes popBounce{0%{transform:scale(0.5)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes bigShake{0%{transform:translate(0,0) scale(1)}10%{transform:translate(-6px,3px) scale(1.01)}20%{transform:translate(5px,-4px) scale(1.02)}30%{transform:translate(-3px,5px) scale(1.01)}40%{transform:translate(4px,-2px)}50%{transform:translate(-2px,3px)}60%{transform:translate(3px,-1px)}70%{transform:translate(-1px,2px)}80%{transform:translate(2px,0px)}90%{transform:translate(-1px,1px)}100%{transform:translate(0,0) scale(1)}}
 @keyframes neonPulse{0%,100%{text-shadow:0 0 8px #c084fc,0 0 18px #8b5cf6}50%{text-shadow:0 0 14px #c084fc,0 0 32px #8b5cf6,0 0 48px #6366f1}}
 @keyframes cosmicShimmer{0%{background-position:200% 50%}100%{background-position:-200% 50%}}
 @keyframes starRotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
@@ -260,6 +304,33 @@ function fbSignInAnon() {
   if (!fbAvailable || !fbAuth) return Promise.reject(new Error("Firebase not available"));
   return fbAuth.signInAnonymously();
 }
+
+function fbRequestAccountDeletion(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.reject("Not available");
+  var deleteDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  return fbDb.collection("users").doc(uid).set({
+    pendingDeletion: true,
+    deletionRequestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    scheduledDeletionDate: deleteDate
+  }, { merge: true });
+}
+function fbCancelDeletion(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.reject("Not available");
+  return fbDb.collection("users").doc(uid).set({
+    pendingDeletion: false,
+    deletionRequestedAt: null,
+    scheduledDeletionDate: null
+  }, { merge: true });
+}
+function fbCheckDeletionStatus(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve(null);
+  return fbDb.collection("users").doc(uid).get().then(function(snap) {
+    if (!snap.exists) return null;
+    var data = snap.data();
+    if (data.pendingDeletion) return { pending: true, date: data.scheduledDeletionDate };
+    return null;
+  }).catch(function() { return null; });
+}
 function fbSignOut() {
   if (!fbAvailable) return Promise.resolve();
   return fbAuth.signOut();
@@ -333,6 +404,94 @@ function fbSaveProfile(uid, data) {
   return fbDb.collection("profiles").doc(uid).set(profile, { merge: true }).catch(function (e) { console.warn("Profile save failed:", e); });
 }
 
+
+
+/* ═══ COIN SHOP (Cosmetics) ═══════════════════════════════════════ */
+var SHOP_ITEMS = {
+  borders: [
+    { id: "border_gold", name: "Gold Ring", price: 2000, css: "2px solid #ffd700" },
+    { id: "border_neon", name: "Neon Glow", price: 3500, css: "2px solid #c084fc" },
+    { id: "border_fire", name: "Fire Ring", price: 5000, css: "2px solid #ff5e78" },
+    { id: "border_ice", name: "Ice Ring", price: 5000, css: "2px solid #56c1ff" },
+    { id: "border_rainbow", name: "Rainbow", price: 10000, css: "2px solid #4ade80" }
+  ],
+  nameColors: [
+    { id: "name_gold", name: "Gold Name", price: 1500, color: "#ffd700" },
+    { id: "name_neon", name: "Neon Purple", price: 1500, color: "#c084fc" },
+    { id: "name_fire", name: "Fire Red", price: 2000, color: "#ff5e78" },
+    { id: "name_ice", name: "Ice Blue", price: 2000, color: "#56c1ff" },
+    { id: "name_green", name: "Emerald", price: 2500, color: "#4ade80" }
+  ],
+  cardThemes: [
+    { id: "card_gold", name: "Gold Cards", price: 4000, accent: "#ffd700" },
+    { id: "card_dark", name: "Obsidian", price: 4000, accent: "#1a1a2e" },
+    { id: "card_neon", name: "Neon Deck", price: 6000, accent: "#c084fc" }
+  ]
+};
+
+/* ═══ REFERRAL SYSTEM ═════════════════════════════════════════════ */
+function fbCreateReferral(uid) {
+  if (!fbAvailable || !fbDb || !uid) return;
+  fbDb.collection("referrals").doc(uid).set({ code: uid, uses: 0, earnings: 0 }, { merge: true }).catch(function(){});
+}
+function fbClaimReferral(newUid, referrerUid) {
+  if (!fbAvailable || !fbDb || !newUid || !referrerUid || newUid === referrerUid) return Promise.resolve(false);
+  return fbDb.collection("referrals").doc(referrerUid).get().then(function(snap) {
+    if (!snap.exists) return false;
+    /* Check if already claimed */
+    return fbDb.collection("referrals").doc(referrerUid).collection("claimed").doc(newUid).get().then(function(claimSnap) {
+      if (claimSnap.exists) return false;
+      var batch = fbDb.batch();
+      batch.set(fbDb.collection("referrals").doc(referrerUid).collection("claimed").doc(newUid), { at: firebase.firestore.FieldValue.serverTimestamp() });
+      batch.update(fbDb.collection("referrals").doc(referrerUid), {
+        uses: firebase.firestore.FieldValue.increment(1),
+        earnings: firebase.firestore.FieldValue.increment(500)
+      });
+      /* Gift 500 chips to referrer */
+      batch.set(fbDb.collection("gifts").add ? fbDb.collection("gifts").doc() : fbDb.collection("gifts").doc(), {
+        from: "system", to: referrerUid, amount: 500, fromUsername: "Referral Bonus", read: false,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      return batch.commit().then(function() { return true; });
+    });
+  }).catch(function() { return false; });
+}
+
+/* ═══ GROUP CHALLENGES (Tournaments) ═════════════════════════════ */
+function fbCreateTournament(hostUid, gameId, friendUids, hostUsername) {
+  if (!fbAvailable || !fbDb) return Promise.reject("No Firebase");
+  var participants = {};
+  participants[hostUid] = { username: hostUsername, score: 0, played: false };
+  friendUids.forEach(function(uid) { participants[uid] = { username: "", score: 0, played: false }; });
+  return fbDb.collection("tournaments").add({
+    host: hostUid, game: gameId, participants: participants,
+    status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000)
+  });
+}
+function fbGetTournaments(uid) {
+  if (!fbAvailable || !fbDb || !uid) return Promise.resolve([]);
+  return fbDb.collection("tournaments").where("status", "in", ["pending", "active"]).get()
+    .then(function(snap) {
+      var results = [];
+      snap.forEach(function(d) {
+        var data = d.data();
+        if (data.participants && data.participants[uid]) {
+          results.push(Object.assign({ id: d.id }, data));
+        }
+      });
+      return results;
+    }).catch(function() { return []; });
+}
+function fbUpdateTournamentScore(tournamentId, uid, score) {
+  if (!fbAvailable || !fbDb) return;
+  var key = "participants." + uid + ".score";
+  var playedKey = "participants." + uid + ".played";
+  var updates = { status: "active" };
+  updates[key] = score;
+  updates[playedKey] = true;
+  fbDb.collection("tournaments").doc(tournamentId).update(updates).catch(function(){});
+}
 
 /* Handle Google redirect result on load */
 function handleRedirectResult() {
@@ -438,6 +597,7 @@ function logError(info) {
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(function(){});
   } catch(e) {}
+  try { if (typeof Sentry !== "undefined" && Sentry.captureMessage) { Sentry.captureMessage(msg, "error"); } } catch(e2) {}
 }
 function initErrorLogging() {
   if (!ERROR_LOGGING_ENABLED) return;
@@ -12969,7 +13129,7 @@ function FeedbackPopup({
     }
   }, "Found a bug? Have an idea for a new game or feature? Let the developer know!"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
-      window.open("https://docs.google.com/forms/d/e/1FAIpQLSfnhUo1RBMFcdKddQmv8--GTCiPOFEeXNLk0f18SzX2lOOSZQ/viewform", "_blank");
+      window.open("https://forms.gle/2YWXZwMGgEZqGvCU7", "_blank");
       onClose();
     },
     style: {
@@ -14307,7 +14467,20 @@ function FluxApp() {
   const [showLookSound, setShowLookSound] = useState(false);
   const [showLookSoundPanel, setShowLookSoundPanel] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [authMode, setAuthMode] = useState("main"); /* main, email, signup */
+  const [authMode, setAuthMode] = useState("main");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDevConsole, setShowDevConsole] = useState(false);
+  const [recentGames, setRecentGames] = useState(function() { try { var r = localStorage.getItem("flux_recent"); return r ? JSON.parse(r) : []; } catch(e) { return []; } });
+  const [showShop, setShowShop] = useState(false);
+  const [ownedItems, setOwnedItems] = useState(save.ownedItems || []);
+  const [equippedBorder, setEquippedBorder] = useState(save.equippedBorder || null);
+  const [equippedNameColor, setEquippedNameColor] = useState(save.equippedNameColor || null);
+  const [equippedCardTheme, setEquippedCardTheme] = useState(save.equippedCardTheme || null);
+  const [showReferral, setShowReferral] = useState(false);
+  const [bigWinShake, setBigWinShake] = useState(false);
+  const [tournaments, setTournaments] = useState([]);
+  const [devLogRefresh, setDevLogRefresh] = useState(0);
+  const [pendingDeletion, setPendingDeletion] = useState(null); /* main, email, signup */
   const [authEmail, setAuthEmail] = useState("");
   const [authPass, setAuthPass] = useState("");
   const [giftTarget, setGiftTarget] = useState(null);
@@ -14662,6 +14835,12 @@ function FluxApp() {
         }
       });
     }
+    /* Big win animations */
+    if (event.profit && event.profit >= 200) {
+      setBigWinShake(true);
+      setTimeout(function() { setBigWinShake(false); }, 800);
+      try { if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]); } catch(e) {}
+    }
     /* Golden particles on big wins */
     if (event.profit && event.profit >= 50) {
       setWinParticles(true);
@@ -14810,7 +14989,6 @@ function FluxApp() {
   function doResetData() {
     resetSave();
     try { localStorage.removeItem("flux_news_seen"); } catch(e) {}
-    try { localStorage.removeItem("fluxbucks_eol_seen"); } catch(e) {}
     setChips(500);
     setSafeMode(false);
     setToastPos("bottom-right");
@@ -14857,7 +15035,7 @@ function FluxApp() {
   
   /* Scroll lock when overlays open */
   useEffect(function () {
-    var anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget;
+    var anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop;
     if (anyOpen) { document.body.style.overflow = "hidden"; }
     else { document.body.style.overflow = ""; }
     return function () { document.body.style.overflow = ""; };
@@ -15064,6 +15242,19 @@ function FluxApp() {
       done = true;
       setSplash("done");
       try { logAnalytics("app_opened", {}); } catch(e) {}
+      /* Check referral code in URL */
+      try {
+        var urlParams = new URLSearchParams(window.location.search);
+        var refCode = urlParams.get("ref");
+        if (refCode && fbUser && refCode !== fbUser.uid) {
+          var refKey = "flux_ref_claimed_" + refCode;
+          if (!localStorage.getItem(refKey)) {
+            fbClaimReferral(fbUser.uid, refCode).then(function(ok) {
+              if (ok) { setChips(function(c) { return c + 500; }); localStorage.setItem(refKey, "1"); }
+            });
+          }
+        }
+      } catch(e) {}
       setHubPhase("logo");
       setTimeout(function () {
         setHubPhase("cards");
@@ -15353,7 +15544,18 @@ function FluxApp() {
       color: "var(--dim)",
       marginTop: 4
     }
-  }, "Win " + dailyChallenge.amount + "+ chips in a single round")), hubPhase === "cards" && /*#__PURE__*/React.createElement("div", {
+  }, "Win " + dailyChallenge.amount + "+ chips in a single round")), hubPhase === "cards" && recentGames.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12 }
+  },
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--dim)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 } }, "\u23F1 Recently Played"),
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 } },
+      recentGames.map(function(gid) {
+        var g = GAMES.find(function(game) { return game.id === gid; });
+        if (!g) return null;
+        return /*#__PURE__*/React.createElement("button", { key: "recent-" + gid, onClick: function() { setGame(gid); }, style: { flexShrink: 0, padding: "8px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap" } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 16 } }, g.icon), g.name);
+      }))),
+  hubPhase === "cards" && /*#__PURE__*/React.createElement("div", {
     key: "grid-" + modeKey,
     style: {
       display: "grid",
@@ -15369,6 +15571,12 @@ function FluxApp() {
       onClick: function () {
         setGame(g.id);
         try { logAnalytics("game_opened", { game: g.id }); } catch(e) {}
+        setRecentGames(function(prev) {
+          var filtered = prev.filter(function(id) { return id !== g.id; });
+          var updated = [g.id].concat(filtered).slice(0, 6);
+          try { localStorage.setItem("flux_recent", JSON.stringify(updated)); } catch(e) {}
+          return updated;
+        });
       },
       animDelay: i * 100,
       isWide: isWide,
@@ -15433,7 +15641,10 @@ function FluxApp() {
       pointerEvents: showSettings || showLeaderboard ? "none" : "auto",
       transition: "opacity 0.2s"
     }
-  }, "������"), splash === "done" && !showSettings && username && /*#__PURE__*/React.createElement("button", {
+  }, "🏆"), splash === "done" && /*#__PURE__*/React.createElement("button", {
+    onClick: function() { setShowShop(true); },
+    style: { position: "fixed", bottom: isWide ? 22 : 18, right: isWide ? 138 : 124, width: isWide ? 50 : 44, height: isWide ? 50 : 44, borderRadius: "50%", background: "var(--surface)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isWide ? 22 : 20, color: "var(--dim)", zIndex: 698, backdropFilter: "blur(8px)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)", opacity: showSettings || showShop ? 0 : 0.6, pointerEvents: showSettings || showShop ? "none" : "auto", transition: "opacity 0.2s" }
+  }, "\uD83D\uDED2"), splash === "done" && !showSettings && username && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowProfile(true);
     },
@@ -15450,7 +15661,7 @@ function FluxApp() {
       gap: 8,
       padding: "0 14px 0 10px",
       fontSize: 13,
-      color: "var(--neon)",
+      color: equippedNameColor ? (SHOP_ITEMS.nameColors.find(function(nc) { return nc.id === equippedNameColor; }) || {}).color || "var(--neon)" : "var(--neon)",
       zIndex: 700,
       backdropFilter: "blur(8px)",
       boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
@@ -15771,7 +15982,7 @@ function FluxApp() {
       borderRadius: 18,
       padding: 24,
       width: "90%",
-      maxWidth: 360,
+      maxWidth: (showLookSoundPanel || showCustomize) ? 420 : 360,
       maxHeight: "90vh",
       overflow: "auto",
       animation: "fadeUp 0.25s",
@@ -15874,7 +16085,7 @@ function FluxApp() {
     }
   }))), /*#__PURE__*/React.createElement("div", {
     style: { display: "flex", gap: 6, alignItems: "center", padding: "8px 10px", background: "var(--surface2)", borderRadius: 10, border: "1px solid var(--border)", marginBottom: 8 }
-  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 14, flexShrink: 0 } }, "������"),
+  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 14, flexShrink: 0 } }, "👤"),
     /*#__PURE__*/React.createElement("div", { style: { flex: 1, position: "relative", minWidth: 0 } },
       /*#__PURE__*/React.createElement("input", {
         value: editUsername,
@@ -15954,12 +16165,12 @@ function FluxApp() {
     /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: "var(--dim)" } }, "\u203A")),
   /* Account + Friends */
   /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 } },
-    /*#__PURE__*/React.createElement("button", { onClick: function () { setShowAccount(true); }, style: { padding: "8px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: fbUser ? "rgba(74,222,128,0.1)" : "var(--surface2)", color: fbUser ? "var(--green)" : "var(--dim)", border: fbUser ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border)", textAlign: "center" } }, fbUser ? "������ Account" : "������ Sign In"),
-    /*#__PURE__*/React.createElement("button", { onClick: function () { if (!fbUser) { setShowAccount(true); return; } setShowFriends(true); doLoadFriends(); }, style: { padding: "8px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "var(--surface2)", color: fbUser ? "var(--cool)" : "var(--dim)", border: fbUser ? "1px solid rgba(86,193,255,0.3)" : "1px solid var(--border)", textAlign: "center", opacity: fbUser ? 1 : 0.5 } }, "������ Friends")),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setShowAccount(true); }, style: { padding: "8px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: fbUser ? "rgba(74,222,128,0.1)" : "var(--surface2)", color: fbUser ? "var(--green)" : "var(--dim)", border: fbUser ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border)", textAlign: "center" } }, fbUser ? "🔒 Account" : "🔓 Sign In"),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { if (!fbUser) { setShowAccount(true); return; } setShowFriends(true); doLoadFriends(); }, style: { padding: "8px 10px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "var(--surface2)", color: fbUser ? "var(--cool)" : "var(--dim)", border: fbUser ? "1px solid rgba(86,193,255,0.3)" : "1px solid var(--border)", textAlign: "center", opacity: fbUser ? 1 : 0.5 } }, "👥 Friends")),
   /* Compact info 2x2 */
   /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 6 } },
-    /*#__PURE__*/React.createElement("button", { onClick: function () { setUsername(editUsername); setShowChangelog(true); setShowSettings(false); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--neon)", border: "1px solid rgba(192,132,252,0.2)", textAlign: "center" } }, "������ New"),
-    /*#__PURE__*/React.createElement("button", { onClick: function () { window.open("https://docs.google.com/forms/d/e/1FAIpQLSfnhUo1RBMFcdKddQmv8--GTCiPOFEeXNLk0f18SzX2lOOSZQ/viewform", "_blank"); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--green)", border: "1px solid rgba(74,222,128,0.2)", textAlign: "center" } }, "������ Feedback"),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setUsername(editUsername); setShowChangelog(true); setShowSettings(false); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--neon)", border: "1px solid rgba(192,132,252,0.2)", textAlign: "center" } }, "📋 New"),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { window.open("https://forms.gle/2YWXZwMGgEZqGvCU7", "_blank"); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--green)", border: "1px solid rgba(74,222,128,0.2)", textAlign: "center" } }, "💬 Feedback"),
     /*#__PURE__*/React.createElement("button", { onClick: function () { setUsername(editUsername); setShowInfo(true); setShowSettings(false); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)", textAlign: "center" } }, "ℹ️ About"),
     /*#__PURE__*/React.createElement("button", { onClick: function () { setUsername(editUsername); setShowHelp(true); setShowSettings(false); }, style: { padding: "6px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: "var(--surface2)", color: "var(--dim)", border: "1px solid var(--border)", textAlign: "center" } }, "❓ Help")),
   /* Troubleshooting row */
@@ -16064,7 +16275,7 @@ function FluxApp() {
       opacity: 0.5,
       fontFamily: "'JetBrains Mono',monospace"
     }
-  }, "FluxBucks ", VERSION)), showResetConfirm && /*#__PURE__*/React.createElement("div", {
+  }, "FluxBucks ", /*#__PURE__*/React.createElement("span", { onClick: function() { if (!window._devTaps) window._devTaps = 0; window._devTaps++; if (window._devTaps >= 5) { setShowDevConsole(true); window._devTaps = 0; } clearTimeout(window._devTapTimer); window._devTapTimer = setTimeout(function() { window._devTaps = 0; }, 2000); } }, VERSION))), showResetConfirm && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center"
     }
@@ -16431,7 +16642,7 @@ function FluxApp() {
       /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
         /*#__PURE__*/React.createElement("button", { onClick: function () { setShowLookSoundPanel(false); }, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2190"),
         /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\uD83C\uDFA8 Look & Sound")),
-      /*#__PURE__*/React.createElement("button", { onClick: closeSettings, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")),
+),
     /* Sound Effects */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -16482,15 +16693,14 @@ function FluxApp() {
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Background")),
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4 } }, BACKGROUNDS[bgPreset] ? BACKGROUNDS[bgPreset].name : "Cosmic Stars")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setShowBgPicker(true); setShowLookSoundPanel(false); }, style: { padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", whiteSpace: "nowrap" } }, "Change"))),
-    /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", marginTop: 8 } },
-      /*#__PURE__*/React.createElement("button", { onClick: function () { setShowLookSoundPanel(false); }, style: { padding: "10px 32px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "2px solid #8b5cf6" } }, "Done"))),
+),
   /* ═══ CUSTOMIZE SUB-PANEL ═══ */
   showCustomize && /*#__PURE__*/React.createElement("div", { style: { animation: "fadeUp 0.2s", width: "100%" } },
     /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
       /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
         /*#__PURE__*/React.createElement("button", { onClick: function () { setShowCustomize(false); }, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2190"),
         /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\u2699\uFE0F Customize")),
-      /*#__PURE__*/React.createElement("button", { onClick: closeSettings, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")),
+),
     /* Toast Position */
     /*#__PURE__*/React.createElement("div", {
       style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -16511,9 +16721,85 @@ function FluxApp() {
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Skip game card animations.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setQuickPlay(function (q) { return !q; }); }, style: { width: 48, height: 28, borderRadius: 14, background: quickPlay ? "var(--green)" : "var(--surface)", border: quickPlay ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
         /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: quickPlay ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
-    /*#__PURE__*/React.createElement("div", { style: { textAlign: "center", marginTop: 8 } },
-      /*#__PURE__*/React.createElement("button", { onClick: function () { setShowCustomize(false); }, style: { padding: "10px 32px", borderRadius: 10, fontSize: 14, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "2px solid #8b5cf6" } }, "Done"))),
-  ), showLeaderboard && /*#__PURE__*/React.createElement(LeaderboardPanel, {
+),
+  ), showShop && /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)" },
+    onClick: function(e) { if (e.target === e.currentTarget) setShowShop(false); }
+  }, /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 20, width: "94%", maxWidth: 420, maxHeight: "90vh", overflow: "auto", animation: "fadeUp 0.25s" } },
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
+      /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\uD83D\uDED2 Coin Shop"),
+      /*#__PURE__*/React.createElement("button", { onClick: function() { setShowShop(false); }, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "var(--dim)", marginBottom: 12, textAlign: "center" } }, "\uD83E\uDE99 " + chips + " chips available"),
+    /* Borders */
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--neon)", letterSpacing: 1, marginBottom: 6 } }, "PROFILE BORDERS"),
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 } },
+      SHOP_ITEMS.borders.map(function(item) {
+        var owned = ownedItems.indexOf(item.id) >= 0;
+        var equipped = equippedBorder === item.id;
+        return /*#__PURE__*/React.createElement("div", { key: item.id, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", background: "var(--surface2)", borderRadius: 8, border: equipped ? item.css : "1px solid var(--border)" } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--text)" } }, item.name),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "var(--dim)", marginLeft: 6 } }, owned ? (equipped ? "Equipped" : "Owned") : item.price + " chips")),
+          owned ? /*#__PURE__*/React.createElement("button", { onClick: function() { setEquippedBorder(equipped ? null : item.id); }, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: equipped ? "var(--green)" : "var(--surface)", color: equipped ? "#fff" : "var(--dim)", border: "1px solid var(--border)" } }, equipped ? "\u2714" : "Equip") :
+          /*#__PURE__*/React.createElement("button", { onClick: function() {
+            if (chips < item.price) return;
+            setChips(function(c) { return c - item.price; });
+            setOwnedItems(function(o) { return o.concat([item.id]); });
+          }, disabled: chips < item.price, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: chips >= item.price ? "linear-gradient(135deg,#c084fc,#818cf8)" : "var(--surface2)", color: chips >= item.price ? "#fff" : "var(--dim)", border: "none", opacity: chips >= item.price ? 1 : 0.4 } }, "Buy"));
+      })),
+    /* Name Colors */
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--neon)", letterSpacing: 1, marginBottom: 6 } }, "NAME COLORS"),
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 } },
+      SHOP_ITEMS.nameColors.map(function(item) {
+        var owned = ownedItems.indexOf(item.id) >= 0;
+        var equipped = equippedNameColor === item.id;
+        return /*#__PURE__*/React.createElement("div", { key: item.id, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--border)" } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: item.color } }, item.name),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "var(--dim)", marginLeft: 6 } }, owned ? (equipped ? "Equipped" : "Owned") : item.price + " chips")),
+          owned ? /*#__PURE__*/React.createElement("button", { onClick: function() { setEquippedNameColor(equipped ? null : item.id); }, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: equipped ? "var(--green)" : "var(--surface)", color: equipped ? "#fff" : "var(--dim)", border: "1px solid var(--border)" } }, equipped ? "\u2714" : "Equip") :
+          /*#__PURE__*/React.createElement("button", { onClick: function() {
+            if (chips < item.price) return;
+            setChips(function(c) { return c - item.price; });
+            setOwnedItems(function(o) { return o.concat([item.id]); });
+          }, disabled: chips < item.price, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: chips >= item.price ? "linear-gradient(135deg,#c084fc,#818cf8)" : "var(--surface2)", color: chips >= item.price ? "#fff" : "var(--dim)", border: "none", opacity: chips >= item.price ? 1 : 0.4 } }, "Buy"));
+      })),
+    /* Card Themes */
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--neon)", letterSpacing: 1, marginBottom: 6 } }, "CARD THEMES"),
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+      SHOP_ITEMS.cardThemes.map(function(item) {
+        var owned = ownedItems.indexOf(item.id) >= 0;
+        var equipped = equippedCardTheme === item.id;
+        return /*#__PURE__*/React.createElement("div", { key: item.id, style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--border)" } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "var(--text)" } }, item.name),
+          owned ? /*#__PURE__*/React.createElement("button", { onClick: function() { setEquippedCardTheme(equipped ? null : item.id); }, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: equipped ? "var(--green)" : "var(--surface)", color: equipped ? "#fff" : "var(--dim)", border: "1px solid var(--border)" } }, equipped ? "\u2714" : "Equip") :
+          /*#__PURE__*/React.createElement("button", { onClick: function() {
+            if (chips < item.price) return;
+            setChips(function(c) { return c - item.price; });
+            setOwnedItems(function(o) { return o.concat([item.id]); });
+          }, disabled: chips < item.price, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: chips >= item.price ? "linear-gradient(135deg,#c084fc,#818cf8)" : "var(--surface2)", color: chips >= item.price ? "#fff" : "var(--dim)", border: "none", opacity: chips >= item.price ? 1 : 0.4 } }, item.price + " \uD83E\uDE99"));
+      }))
+  )),
+  showDevConsole && /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", inset: 0, zIndex: 500, display: "flex", flexDirection: "column", background: "rgba(0,0,0,0.95)" }
+  },
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid #333" } },
+      /*#__PURE__*/React.createElement("span", { style: { fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700, color: "#4ade80" } }, "> Dev Console"),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8 } },
+        /*#__PURE__*/React.createElement("button", { onClick: function() { _devLogs.length = 0; setDevLogRefresh(function(r) { return r+1; }); }, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, background: "#333", color: "#aaa", border: "none" } }, "Clear"),
+        /*#__PURE__*/React.createElement("button", { onClick: function() { setShowDevConsole(false); }, style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, background: "#333", color: "#aaa", border: "none" } }, "Close"))),
+    /*#__PURE__*/React.createElement("div", { style: { flex: 1, overflow: "auto", padding: "8px 12px", fontFamily: "'JetBrains Mono',monospace", fontSize: 10, lineHeight: 1.6 } },
+      _devLogs.slice(-100).map(function(entry, i) {
+        var color = entry.level === "error" ? "#ff5e78" : entry.level === "warn" ? "#ffcf56" : "#8b8b9e";
+        var time = new Date(entry.t).toLocaleTimeString();
+        return /*#__PURE__*/React.createElement("div", { key: i, style: { color: color, wordBreak: "break-all", borderBottom: "1px solid #1a1a2e", paddingBottom: 2, marginBottom: 2 } },
+          /*#__PURE__*/React.createElement("span", { style: { color: "#555" } }, time + " "),
+          /*#__PURE__*/React.createElement("span", { style: { color: entry.level === "error" ? "#ff5e78" : entry.level === "warn" ? "#fbbf24" : "#4ade80" } }, "[" + entry.level.toUpperCase() + "] "),
+          entry.msg);
+      }),
+      _devLogs.length === 0 && /*#__PURE__*/React.createElement("div", { style: { color: "#555", textAlign: "center", padding: 40 } }, "No logs yet. Interact with the app to see output here."))
+  ),
+  showLeaderboard && /*#__PURE__*/React.createElement(LeaderboardPanel, {
     onClose: function() { setShowLeaderboard(false); },
     fbUser: fbUser, friendsList: friendsList, lifetimeXp: lifetimeXp, username: username, avatar: avatar
   }),
@@ -16522,7 +16808,7 @@ function FluxApp() {
     style: { position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)" },
     onClick: function(e) { if (e.target === e.currentTarget) setGiftTarget(null); }
   }, /*#__PURE__*/React.createElement("div", { style: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "85%", maxWidth: 320, animation: "fadeUp 0.25s", textAlign: "center" } },
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "������"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "🎁"),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 } }, "Send FluxBucks to " + (giftTarget.username || "Player")),
     /*#__PURE__*/React.createElement("input", { type: "number", value: giftAmount, onChange: function(e) { setGiftAmount(e.target.value); }, placeholder: "Amount (min 100)", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 14, fontFamily: "'JetBrains Mono',monospace", marginBottom: 8, textAlign: "center" } }),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 12 } }, "Max: " + Math.min(Math.floor(chips * 0.1), 100000)),
@@ -16657,7 +16943,7 @@ function FluxApp() {
     }
   }, "Have an idea for a background that would look great in FluxBucks? Submit your suggestion and the developer will review it!"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
-      window.open("https://docs.google.com/forms/d/e/1FAIpQLSfnhUo1RBMFcdKddQmv8--GTCiPOFEeXNLk0f18SzX2lOOSZQ/viewform", "_blank");
+      window.open("https://forms.gle/2YWXZwMGgEZqGvCU7", "_blank");
     },
     style: {
       padding: "12px 28px",
@@ -16795,17 +17081,19 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("button", { onClick: function() { setFbError(null); fbSignInAnon().catch(function(e) { setFbError(e.message); }); }, style: { padding: "9px 20px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "transparent", color: "var(--dim)", border: "1px solid var(--border)", width: "100%" } }, "Continue as Guest")
       ) :
       /*#__PURE__*/React.createElement(React.Fragment, null,
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 } }, authMode === "signup" ? "Create Account" : "Email Sign In"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 } }, authMode === "signup" ? "\u2728 Create New Account" : "\u2709\uFE0F Email Sign In"),
         /*#__PURE__*/React.createElement("input", { type: "email", value: authEmail, onChange: function(e) { setAuthEmail(e.target.value); }, placeholder: "Email address", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, marginBottom: 8 } }),
         /*#__PURE__*/React.createElement("input", { type: "password", value: authPass, onChange: function(e) { setAuthPass(e.target.value); }, placeholder: "Password", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, marginBottom: 12 } }),
         /*#__PURE__*/React.createElement("button", { onClick: function() {
           setFbError(null);
+          if (authPass.length < 8) { setFbError("Password must be at least 8 characters"); return; }
+          if (!authEmail.includes("@")) { setFbError("Please enter a valid email address"); return; }
           if (authMode === "signup") { fbSignUpEmail(authEmail, authPass).catch(function(e) { setFbError(e.message); }); }
           else { fbSignInEmail(authEmail, authPass).catch(function(e) { setFbError(e.message); }); }
-        }, style: { padding: "11px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none", width: "100%", marginBottom: 8 } }, authMode === "signup" ? "Create Account" : "Sign In"),
+        }, style: { padding: "11px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: authMode === "signup" ? "linear-gradient(135deg,#4ade80,#22c55e)" : "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none", width: "100%", marginBottom: 8 } }, authMode === "signup" ? "\u2728 Create Account" : "\uD83D\uDD12 Sign In"),
         /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between" } },
           /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode("main"); setFbError(null); }, style: { fontSize: 11, color: "var(--dim)", background: "none", border: "none", textDecoration: "underline" } }, "\u2190 Back"),
-          /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode(authMode === "signup" ? "email" : "signup"); setFbError(null); }, style: { fontSize: 11, color: "var(--neon)", background: "none", border: "none", textDecoration: "underline" } }, authMode === "signup" ? "Have an account? Sign in" : "New? Create account"))
+          /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode(authMode === "signup" ? "email" : "signup"); setFbError(null); }, style: { fontSize: 11, color: "var(--neon)", background: "none", border: "none", textDecoration: "underline" } }, authMode === "signup" ? "Have an account? Sign in" : "Create Account"))
       ),
       fbError && /*#__PURE__*/React.createElement("div", { style: { marginTop: 12, fontSize: 12, color: "var(--accent)", background: "rgba(255,94,120,0.1)", border: "1px solid rgba(255,94,120,0.3)", borderRadius: 8, padding: "8px 12px" } }, fbError)
     ) : /*#__PURE__*/React.createElement("div", null,
@@ -16820,6 +17108,14 @@ function FluxApp() {
       ),
       /*#__PURE__*/React.createElement("div", { style: { padding: 14, background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16 } },
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--dim)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 } }, "Friend Code"),
+        /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, padding: 10, background: "rgba(74,222,128,0.08)", borderRadius: 10, border: "1px solid rgba(74,222,128,0.2)" } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--green)", marginBottom: 6 } }, "\uD83C\uDF81 Referral Link"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: "var(--dim)", marginBottom: 8 } }, "Share this link. When someone signs up, you both get 500 chips!"),
+          /*#__PURE__*/React.createElement("button", { onClick: function() {
+            var url = window.location.href.split("?")[0] + "?ref=" + fbUser.uid;
+            if (navigator.share) { navigator.share({ title: "Play FluxBucks!", url: url }); }
+            else if (navigator.clipboard) { navigator.clipboard.writeText(url); }
+          }, style: { padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "linear-gradient(135deg,#4ade80,#22c55e)", color: "#fff", border: "none", width: "100%" } }, "\uD83D\uDD17 Copy Referral Link")),
         /*#__PURE__*/React.createElement("img", { src: "https://api.qrserver.com/v1/create-qr-code/?size=120x120&bgcolor=0d0d1a&color=c084fc&data=" + encodeURIComponent(fbUser.uid), style: { width: 100, height: 100, borderRadius: 8, margin: "8px auto", display: "block", imageRendering: "pixelated" } }),
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontFamily: "'JetBrains Mono',monospace", color: "var(--neon)", background: "var(--bg)", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", wordBreak: "break-all", userSelect: "all" } }, fbUser.uid),
         /*#__PURE__*/React.createElement("button", { onClick: function () { try { navigator.clipboard.writeText(fbUser.uid); } catch(e) {} }, style: { marginTop: 8, padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--dim)", border: "1px solid var(--border)" } }, "\uD83D\uDCCB Copy Code")
@@ -16829,7 +17125,16 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: fbSyncing ? "var(--neon2)" : "var(--green)", marginBottom: 8 } }, fbSyncing ? "\u23F3 Syncing..." : fbLastSync ? "\u2705 Last synced " + new Date(fbLastSync).toLocaleTimeString() : "\u2705 Connected"),
         /*#__PURE__*/React.createElement("button", { onClick: doFbForceSync, disabled: fbSyncing, style: { padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)" } }, "\uD83D\uDD04 Sync Now")
       ),
-      /*#__PURE__*/React.createElement("button", { onClick: doFbSignOut, style: { padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "rgba(255,94,120,0.1)", color: "var(--accent)", border: "1px solid rgba(255,94,120,0.3)", width: "100%", textAlign: "center" } }, "\uD83D\uDEAA Sign Out")
+      /*#__PURE__*/React.createElement("button", { onClick: doFbSignOut, style: { padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "rgba(255,94,120,0.1)", color: "var(--accent)", border: "1px solid rgba(255,94,120,0.3)", width: "100%", textAlign: "center" } }, "\uD83D\uDEAA Sign Out"),
+      pendingDeletion ? /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, padding: 12, borderRadius: 10, background: "rgba(255,94,120,0.08)", border: "1px solid rgba(255,94,120,0.2)", textAlign: "center" } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--accent)", marginBottom: 8 } }, "\u26A0\uFE0F Account scheduled for deletion"),
+        /*#__PURE__*/React.createElement("button", { onClick: function() { fbCancelDeletion(fbUser.uid).then(function() { setPendingDeletion(null); }); }, style: { padding: "6px 16px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface2)", color: "var(--green)", border: "1px solid rgba(74,222,128,0.3)" } }, "Cancel Deletion")
+      ) :
+      /*#__PURE__*/React.createElement("button", { onClick: function() {
+        if (confirm("Delete your account? Your data will be removed after 7 days. You can recover within that period.")) {
+          fbRequestAccountDeletion(fbUser.uid).then(function() { setPendingDeletion({ pending: true }); });
+        }
+      }, style: { padding: "8px 16px", borderRadius: 10, fontSize: 10, fontWeight: 600, background: "transparent", color: "var(--dim)", border: "1px solid var(--border)", width: "100%", textAlign: "center", marginTop: 6 } }, "Delete Account")
     )
   )),
 
@@ -16957,6 +17262,7 @@ function Wrap({
       fontFamily: "'Outfit',sans-serif",
       position: "relative",
       overflow: "hidden",
+      animation: bigWinShake ? "bigShake 0.6s ease-out" : "none",
       paddingTop: "env(safe-area-inset-top, 0px)",
       paddingBottom: "env(safe-area-inset-bottom, 0px)"
     }
@@ -16990,56 +17296,6 @@ function Wrap({
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
-</script>
-<script>
-(function(){
-  var POPUP_KEY = "fluxbucks_eol_seen";
-  var style = document.createElement("style");
-  style.textContent = "@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes popUp{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}";
-  document.head.appendChild(style);
-
-  function showEndPopup(){
-    var existing = document.getElementById("eol-overlay");
-    if(existing) existing.remove();
-
-    var overlay = document.createElement("div");
-    overlay.id = "eol-overlay";
-    overlay.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);animation:fadeIn .3s ease";
-    var box = document.createElement("div");
-    box.style.cssText = "background:#0d0d12;border:2px solid #818cf8;border-radius:18px;padding:24px;width:88%;max-width:360px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;animation:popUp .3s ease";
-    box.innerHTML = '<div style="font-size:36px;margin-bottom:10px">👋</div>'
-      + '<div style="font-size:18px;font-weight:900;font-style:italic;color:#fff;margin-bottom:10px">FluxBucks is Mostly Discontinued</div>'
-      + '<p style="font-size:13px;color:#888;line-height:1.7;margin-bottom:18px">Hey — just wanted to let you know that FluxBucks is mostly discontinued. Occasional updates may still be added to improve your experience or help the game run better.<br><br>The game will stay fully playable, nothing is being taken down.<br><br>Thanks for playing.</p>'
-      + '<button id="eol-dismiss" style="padding:10px 32px;border-radius:10px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#c084fc,#818cf8);color:#fff;border:none;cursor:pointer">Got it</button>';
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    overlay.onclick = function(e){ if(e.target === overlay) dismiss(); };
-    document.getElementById("eol-dismiss").onclick = dismiss;
-
-    function dismiss(){
-      localStorage.setItem(POPUP_KEY, "1");
-      overlay.style.opacity = "0";
-      overlay.style.transition = "opacity .2s";
-      setTimeout(function(){ overlay.remove(); }, 200);
-    }
-  }
-
-  function addFloatingBtn(){
-    if(document.getElementById("eol-float-btn")) return;
-    var btn = document.createElement("div");
-    btn.id = "eol-float-btn";
-    btn.style.cssText = "position:fixed;bottom:calc(16px + env(safe-area-inset-bottom, 0px));left:calc(16px + env(safe-area-inset-left, 0px));z-index:900;width:36px;height:36px;border-radius:50%;background:#1a1a2e;border:1px solid #818cf8;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.4);";
-    btn.textContent = "📢";
-    btn.onclick = showEndPopup;
-    document.body.appendChild(btn);
-  }
-
-  if(!localStorage.getItem(POPUP_KEY)){
-    setTimeout(showEndPopup, 4000);
-  }
-
-  setTimeout(addFloatingBtn, 2000);
-})();
 </script>
 
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js").catch(function(){});}</script>
