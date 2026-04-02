@@ -15654,7 +15654,8 @@ function FluxApp() {
     style: {
       position: "fixed",
       bottom: isWide ? 22 : "calc(18px + env(safe-area-inset-bottom, 0px))",
-      left: isWide ? 64 : "calc(64px + env(safe-area-inset-left, 0px))",
+      left: "50%",
+      transform: "translateX(-50%)",
       height: isWide ? 50 : 44,
       borderRadius: 22,
       background: "var(--surface)",
@@ -15663,6 +15664,7 @@ function FluxApp() {
       alignItems: "center",
       gap: 8,
       padding: "0 14px 0 10px",
+      maxWidth: "70vw",
       fontSize: 13,
       color: equippedNameColor ? (SHOP_ITEMS.nameColors.find(function(nc) { return nc.id === equippedNameColor; }) || {}).color || "var(--neon)" : "var(--neon)",
       zIndex: 700,
