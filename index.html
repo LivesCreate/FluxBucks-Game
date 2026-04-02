@@ -3239,6 +3239,19 @@ function AnimNum({
   const [disp, setDisp] = useState(value);
   const prev = useRef(value);
   useEffect(() => {
+  var anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop;
+  if (anyOpen) { 
+    document.body.style.overflow = "hidden"; 
+    document.documentElement.style.overflow = "hidden"; // Add this!
+  } else { 
+    document.body.style.overflow = ""; 
+    document.documentElement.style.overflow = ""; // Add this!
+  }
+  return function () { 
+    document.body.style.overflow = ""; 
+    document.documentElement.style.overflow = ""; 
+  };
+}, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget]);
     const from = prev.current;
     const to = value;
     if (from === to) return;
