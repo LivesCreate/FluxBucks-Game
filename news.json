@@ -1,9 +1,9 @@
 [
   {
-    "id": 13,
+    "id": 14,
     "type": "update",
     "icon": "✨",
-    "title": "v5.0.1 — Cleanup",
-    "message": "Removed the discontinued popup. FluxBucks is alive and well!"
+    "title": "v5.0.2 — APK Stability",
+    "message": "APK version fixed and improved.\n\n• Fixed black screen on APK launch\n• Sentry loads dynamically (non-blocking) in APK\n• Native loading screen while app initializes\n• Improved native app feel (no browser UI)\n• Hidden scrollbars for cleaner look"
   }
 ]

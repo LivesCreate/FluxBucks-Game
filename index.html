@@ -27,7 +27,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.0.1";
+const VERSION = "v5.0.2";
 try { if (typeof firebase !== "undefined") { initErrorLogging(); handleRedirectResult(); } } catch(e) {}
 
 /* Sentry Error Monitoring */
@@ -55,6 +55,7 @@ try {
 const FONTS_URL = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600;700&display=swap";
 
 /* ═══ DEVELOPER CONSOLE ═══════════════════════════════════════════ */
+var _fluxShake = false;
 var _devLogs = [];
 var _devLogMax = 200;
 var _origConsoleLog = console.log;
@@ -14838,7 +14839,9 @@ function FluxApp() {
     /* Big win animations */
     if (event.profit && event.profit >= 200) {
       setBigWinShake(true);
-      setTimeout(function() { setBigWinShake(false); }, 800);
+      _fluxShake = true;
+      try { document.getElementById("root").style.animation = "bigShake 0.6s ease-out"; } catch(e) {}
+      setTimeout(function() { setBigWinShake(false); _fluxShake = false; try { document.getElementById("root").style.animation = "none"; } catch(e) {} }, 800);
       try { if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]); } catch(e) {}
     }
     /* Golden particles on big wins */
@@ -17262,7 +17265,6 @@ function Wrap({
       fontFamily: "'Outfit',sans-serif",
       position: "relative",
       overflow: "hidden",
-      animation: bigWinShake ? "bigShake 0.6s ease-out" : "none",
       paddingTop: "env(safe-area-inset-top, 0px)",
       paddingBottom: "env(safe-area-inset-bottom, 0px)"
     }
