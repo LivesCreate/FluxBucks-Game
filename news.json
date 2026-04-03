@@ -1,9 +1,9 @@
 [
   {
-    "id": 14,
+    "id": 15,
     "type": "update",
     "icon": "✨",
-    "title": "v5.0.2 — APK Stability",
-    "message": "APK version fixed and improved.\n\n• Fixed black screen on APK launch\n• Sentry loads dynamically (non-blocking) in APK\n• Native loading screen while app initializes\n• Improved native app feel (no browser UI)\n• Hidden scrollbars for cleaner look"
+    "title": "v5.0.3 — Stability Fixes",
+    "message": "UI fixes and stability improvements.\n\n• Fixed splash screen — FluxBucks text stays together\n• Scrollbars completely hidden on all platforms\n• Safer scroll lock for popups (no more black screen risk)\n• Player name button truncates long names properly\n• General stability improvements"
   }
 ]

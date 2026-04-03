@@ -27,7 +27,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.0.2";
+const VERSION = "v5.0.3";
 try { if (typeof firebase !== "undefined") { initErrorLogging(); handleRedirectResult(); } } catch(e) {}
 
 /* Sentry Error Monitoring */
@@ -153,6 +153,9 @@ const SLOT_PAY = {
   "🎰": 40
 };
 const CSS = `
+html,body,:root{scrollbar-width:none !important;-ms-overflow-style:none !important}
+::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important;background:transparent !important}
+*::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important}
 :root{--bg:#050508;--surface:rgba(14,14,28,0.85);--surface2:rgba(22,22,42,0.65);--border:rgba(255,255,255,0.06);--neon:#c084fc;--neon2:#818cf8;--accent:#ff5e78;--cool:#56c1ff;--green:#4ade80;--text:#e0e0e8;--dim:#6b6b80;--card:#fdfaf5}
 *{box-sizing:border-box;margin:0;padding:0}
 @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
@@ -196,14 +199,13 @@ const CSS = `
 @keyframes particleFly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--px),var(--py)) scale(0)}}
 @keyframes cardShine{0%{left:-100%}100%{left:200%}}
 @keyframes glowPulse{0%,100%{box-shadow:0 0 8px var(--glow-color,transparent)}50%{box-shadow:0 0 20px var(--glow-color,transparent)}}
-@keyframes splashBucksSlide{0%,60%{transform:translateX(0);opacity:1}85%{transform:translateX(80px);opacity:0}100%{transform:translateX(80px);opacity:0}}
 @keyframes goldParticle{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--px),var(--py)) scale(0.3)}}
 @keyframes goldGlow{0%{opacity:0;transform:scale(0.5)}30%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(2)}}
 button{font-family:'Outfit',sans-serif;cursor:pointer;border:none;transition:all 0.22s cubic-bezier(0.34,1.56,0.64,1)}
 button:hover:not(:disabled){transform:translateY(-2px) scale(1.03);filter:brightness(1.12)}
 button:active:not(:disabled){transform:translateY(1px) scale(0.97)}
 button:disabled{cursor:not-allowed;opacity:0.35}
-::-webkit-scrollbar{display:none;width:0} *{-ms-overflow-style:none;scrollbar-width:none;}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 `;
 
 /* ═══════════ SAVE SYSTEM ════════════════════════════════════════ */
@@ -3239,19 +3241,6 @@ function AnimNum({
   const [disp, setDisp] = useState(value);
   const prev = useRef(value);
   useEffect(() => {
-  var anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop;
-  if (anyOpen) { 
-    document.body.style.overflow = "hidden"; 
-    document.documentElement.style.overflow = "hidden"; // Add this!
-  } else { 
-    document.body.style.overflow = ""; 
-    document.documentElement.style.overflow = ""; // Add this!
-  }
-  return function () { 
-    document.body.style.overflow = ""; 
-    document.documentElement.style.overflow = ""; 
-  };
-}, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget]);
     const from = prev.current;
     const to = value;
     if (from === to) return;
@@ -15051,11 +15040,26 @@ function FluxApp() {
   
   /* Scroll lock when overlays open */
   useEffect(function () {
-    var anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop;
-    if (anyOpen) { document.body.style.overflow = "hidden"; }
-    else { document.body.style.overflow = ""; }
-    return function () { document.body.style.overflow = ""; };
-  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget]);
+    try {
+      var anyOpen = false;
+      try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop; } catch(e) { anyOpen = false; }
+      if (document.body) {
+        document.body.style.overflow = anyOpen ? "hidden" : "";
+        document.body.style.position = anyOpen ? "fixed" : "";
+        document.body.style.width = anyOpen ? "100%" : "";
+        document.body.style.top = anyOpen ? "0" : "";
+      }
+      if (document.documentElement) {
+        document.documentElement.style.overflow = anyOpen ? "hidden" : "";
+      }
+    } catch(e) {}
+    return function () {
+      try {
+        if (document.body) { document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = ""; document.body.style.top = ""; }
+        if (document.documentElement) { document.documentElement.style.overflow = ""; }
+      } catch(e) {}
+    };
+  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop]);
 
   // Check safe mode achievement
   useEffect(function () {
@@ -15348,7 +15352,6 @@ function FluxApp() {
       background: "linear-gradient(135deg,#818cf8,#56c1ff,#c084fc)",
       WebkitBackgroundClip: "text",
       backgroundClip: "text",
-      animation: "splashBucksSlide 2.5s ease-in-out forwards",
       display: "inline-block"
     }
   }, "Bucks")), /*#__PURE__*/React.createElement("div", {
@@ -15688,7 +15691,7 @@ function FluxApp() {
       opacity: 1,
       fontSize: 13
     }
-  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 20, lineHeight: 1, verticalAlign: "middle" } }, avatar), " ", username + " · Lv." + getLevelInfo(xp).level), showProfile && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", { style: { fontSize: 20, lineHeight: 1, flexShrink: 0 } }, avatar), /*#__PURE__*/React.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 } }, username + " · Lv." + getLevelInfo(xp).level)), showProfile && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
