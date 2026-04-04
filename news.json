@@ -1,9 +1,9 @@
 [
   {
-    "id": 16,
+    "id": 17,
     "type": "update",
     "icon": "✨",
-    "title": "v5.0.4 — Big QoL Update",
-    "message": "Tons of quality-of-life improvements.\n\n• Fixed guest login error handling\n• Scroll lock now covers ALL popups\n• Fixed ghost box on wide screens\n• Account panel can't be closed accidentally\n• Back button in email sign-in is more visible\n• Data Saver moved to Customize panel\n• Recently Played can be toggled off\n• About section expanded with services, history, and known issues\n• APK warns before opening external links\n• Various UI fixes"
+    "title": "v5.0.5 — Bug Fixes",
+    "message": "Critical bug fixes and gameplay improvements.\n\n• Fixed Stock Trader sell bug — profits now calculate correctly\n• Baccarat shows card placeholders before dealing\n• Baccarat guide updated with explicit card values (J/Q/K = 0)\n• Bomb Defuser hints now cost chips (scaled to bet size)\n• Password field shows minimum requirement\n• Username save shows confirmation\n• APK warns before Google sign-in redirect"
   }
 ]
