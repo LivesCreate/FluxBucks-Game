@@ -27,7 +27,7 @@ const {
   useRef,
   useCallback
 } = React;
-const VERSION = "v5.0.3";
+const VERSION = "v5.0.4";
 try { if (typeof firebase !== "undefined") { initErrorLogging(); handleRedirectResult(); } } catch(e) {}
 
 /* Sentry Error Monitoring */
@@ -13412,7 +13412,17 @@ function InfoPanel({
       marginBottom: 14,
       lineHeight: 1.5
     }
-  }, "FluxBucks games are inspired by popular online casino and skill game platforms. All games use virtual chips only \u2014 no real money involved. Sign in with Google to enable cloud saves and add friends."), GAME_CREDITS.map(function (g) {
+  }, "FluxBucks is a virtual casino and skill game collection built with React. All games use virtual chips \u2014 no real money involved."),
+    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14, padding: 12, background: "var(--surface2)", borderRadius: 10, border: "1px solid var(--border)" } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--neon)", marginBottom: 6 } }, "\uD83D\uDEE0\uFE0F Services Used"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.6 } }, "React 18.2 \u2014 UI framework\nFirebase Auth \u2014 Google, Email, and Guest sign-in\nFirestore \u2014 Cloud saves, friends, leaderboards, analytics\nSentry.io \u2014 Error monitoring and crash reporting\nGitHub Pages \u2014 Web hosting\nCapacitor \u2014 Android APK builds")),
+    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14, padding: 12, background: "var(--surface2)", borderRadius: 10, border: "1px solid var(--border)" } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--neon)", marginBottom: 6 } }, "\uD83D\uDCC5 History"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.6 } }, "Originally created in early 2025 as a simple casino prototype. Development resumed in March 2026 with Claude AI as the primary development partner. The game grew from a single dice game into a collection of 29+ games with cloud saves, friends, leaderboards, and more.")),
+    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14, padding: 12, background: "rgba(255,94,120,0.06)", borderRadius: 10, border: "1px solid rgba(255,94,120,0.15)" } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 6 } }, "\u26A0\uFE0F Known Issues"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.8 } }, "\u2022 Look & Sound and Customize panels may create a ghost box on wide screens\n\u2022 Player name button may overlap on some Android screen sizes\n\u2022 Only tested on Android (Pixel 9). iOS behavior unknown \u2014 no iOS test device available\n\u2022 APK version opens external links in browser instead of in-app\n\u2022 Some emoji may display as ? on older Android WebViews")),
+    /*#__PURE__*/React.createElement("p", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.5, textAlign: "center", marginBottom: 8 } }, "Built solo with \u2764\uFE0F and Claude AI"), GAME_CREDITS.map(function (g) {
     return /*#__PURE__*/React.createElement("div", {
       key: g.name,
       style: {
@@ -14482,6 +14492,7 @@ function FluxApp() {
   const [showReferral, setShowReferral] = useState(false);
   const [bigWinShake, setBigWinShake] = useState(false);
   const [tournaments, setTournaments] = useState([]);
+  const [showRecentGames, setShowRecentGames] = useState(function() { try { return localStorage.getItem("flux_show_recent") !== "0"; } catch(e) { return true; } });
   const [devLogRefresh, setDevLogRefresh] = useState(0);
   const [pendingDeletion, setPendingDeletion] = useState(null); /* main, email, signup */
   const [authEmail, setAuthEmail] = useState("");
@@ -15042,7 +15053,7 @@ function FluxApp() {
   useEffect(function () {
     try {
       var anyOpen = false;
-      try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop; } catch(e) { anyOpen = false; }
+      try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard; } catch(e) { anyOpen = false; }
       if (document.body) {
         document.body.style.overflow = anyOpen ? "hidden" : "";
         document.body.style.position = anyOpen ? "fixed" : "";
@@ -15059,7 +15070,7 @@ function FluxApp() {
         if (document.documentElement) { document.documentElement.style.overflow = ""; }
       } catch(e) {}
     };
-  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop]);
+  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard]);
 
   // Check safe mode achievement
   useEffect(function () {
@@ -15298,6 +15309,7 @@ function FluxApp() {
     forceWin
   };
   /* Feature 6: Lazy game loading via registry */
+  var _anyOverlay = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard;
   if (game && _gameRegistry[game]) {
     var _extraProps = null;
     if (game === "packs") _extraProps = { collection: collection, setCollection: setCollection };
@@ -15563,7 +15575,7 @@ function FluxApp() {
       color: "var(--dim)",
       marginTop: 4
     }
-  }, "Win " + dailyChallenge.amount + "+ chips in a single round")), hubPhase === "cards" && recentGames.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "Win " + dailyChallenge.amount + "+ chips in a single round")), hubPhase === "cards" && showRecentGames && recentGames.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: { marginBottom: 12 }
   },
     /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "var(--dim)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 } }, "\u23F1 Recently Played"),
@@ -15633,8 +15645,8 @@ function FluxApp() {
       zIndex: 700,
       backdropFilter: "blur(8px)",
       boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-      opacity: showSettings ? 0 : 0.6,
-      pointerEvents: showSettings ? "none" : "auto",
+      opacity: _anyOverlay ? 0 : 0.6,
+      pointerEvents: _anyOverlay ? "none" : "auto",
       transition: "opacity 0.2s"
     }
   }, "\u2699\uFE0F"), splash === "done" && /*#__PURE__*/React.createElement("button", {
@@ -15656,14 +15668,14 @@ function FluxApp() {
       zIndex: 699,
       backdropFilter: "blur(8px)",
       boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-      opacity: showSettings || showLeaderboard ? 0 : 0.6,
-      pointerEvents: showSettings || showLeaderboard ? "none" : "auto",
+      opacity: _anyOverlay ? 0 : 0.6,
+      pointerEvents: _anyOverlay ? "none" : "auto",
       transition: "opacity 0.2s"
     }
   }, "🏆"), splash === "done" && /*#__PURE__*/React.createElement("button", {
     onClick: function() { setShowShop(true); },
-    style: { position: "fixed", bottom: isWide ? 22 : 18, right: isWide ? 138 : 124, width: isWide ? 50 : 44, height: isWide ? 50 : 44, borderRadius: "50%", background: "var(--surface)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isWide ? 22 : 20, color: "var(--dim)", zIndex: 698, backdropFilter: "blur(8px)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)", opacity: showSettings || showShop ? 0 : 0.6, pointerEvents: showSettings || showShop ? "none" : "auto", transition: "opacity 0.2s" }
-  }, "\uD83D\uDED2"), splash === "done" && !showSettings && username && /*#__PURE__*/React.createElement("button", {
+    style: { position: "fixed", bottom: isWide ? 22 : 18, right: isWide ? 138 : 124, width: isWide ? 50 : 44, height: isWide ? 50 : 44, borderRadius: "50%", background: "var(--surface)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: isWide ? 22 : 20, color: "var(--dim)", zIndex: 698, backdropFilter: "blur(8px)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)", opacity: _anyOverlay ? 0 : 0.6, pointerEvents: _anyOverlay ? "none" : "auto", transition: "opacity 0.2s" }
+  }, "\uD83D\uDED2"), splash === "done" && !_anyOverlay && username && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowProfile(true);
     },
@@ -16003,7 +16015,7 @@ function FluxApp() {
       borderRadius: 18,
       padding: 24,
       width: "90%",
-      maxWidth: (showLookSoundPanel || showCustomize) ? 420 : 360,
+      maxWidth: 360,
       maxHeight: "90vh",
       overflow: "auto",
       animation: "fadeUp 0.25s",
@@ -16121,15 +16133,7 @@ function FluxApp() {
       disabled: savingName || editUsername === username,
       style: { width: 32, height: 32, borderRadius: 8, fontSize: 14, fontWeight: 700, opacity: (savingName || editUsername === username) ? 0.4 : 1, background: savingName ? "rgba(74,222,128,0.15)" : "var(--surface)", color: savingName ? "var(--green)" : "var(--dim)", border: savingName ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.3s", padding: 0 }
     }, savingName ? /*#__PURE__*/React.createElement("span", { style: { display: "inline-block", animation: "starRotate 1s linear infinite", fontSize: 12 } }, "⏳") : "✔")),
-  /* Data Saver — moved to main settings */
-  /*#__PURE__*/React.createElement("div", {
-    style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
-    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDCF6"),
-    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Data Saver")),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Syncs less often to save data." + (netInfo.type !== "unknown" ? " Network: " + netInfo.type + (netInfo.online ? "" : " (offline)") : ""))),
-    /*#__PURE__*/React.createElement("button", { onClick: function () { setDataSaver(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: dataSaver ? "var(--green)" : "var(--surface)", border: dataSaver ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
-    /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: dataSaver ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
+  
   
   /* Notifications toggle */
   /*#__PURE__*/React.createElement("div", {
@@ -16722,6 +16726,16 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("button", { onClick: function () { setShowCustomize(false); }, style: { width: 32, height: 32, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--dim)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2190"),
         /*#__PURE__*/React.createElement("h2", { style: { fontFamily: "'Playfair Display',serif", fontSize: 18, fontWeight: 900, fontStyle: "italic", color: "var(--text)" } }, "\u2699\uFE0F Customize")),
 ),
+    /* Recently Played toggle */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\u23F1"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Recently Played")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Show quick access row above games.")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setShowRecentGames(function(v) { var n = !v; try { localStorage.setItem("flux_show_recent", n ? "1" : "0"); } catch(e) {} return n; }); }, style: { width: 48, height: 28, borderRadius: 14, background: showRecentGames ? "var(--green)" : "var(--surface)", border: showRecentGames ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: showRecentGames ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /* Toast Position */
     /*#__PURE__*/React.createElement("div", {
       style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -16732,6 +16746,15 @@ function FluxApp() {
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Popup Position")),
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4 } }, "Where achievements appear.")),
       /*#__PURE__*/React.createElement("button", { onClick: function () { setShowToastPicker(true); setShowCustomize(false); }, style: { padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--surface)", color: "var(--cool)", border: "1px solid rgba(86,193,255,0.3)", whiteSpace: "nowrap" } }, toastPos === "bottom-right" ? "\u2198 Bottom Right" : toastPos === "bottom-left" ? "\u2199 Bottom Left" : toastPos === "top-right" ? "\u2197 Top Right" : "\u2196 Top Left"))),
+    /* Data Saver — moved to main settings */
+  /*#__PURE__*/React.createElement("div", {
+    style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDCF6"),
+    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Data Saver")),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Syncs less often to save data." + (netInfo.type !== "unknown" ? " Network: " + netInfo.type + (netInfo.online ? "" : " (offline)") : ""))),
+    /*#__PURE__*/React.createElement("button", { onClick: function () { setDataSaver(function (v) { return !v; }); }, style: { width: 48, height: 28, borderRadius: 14, background: dataSaver ? "var(--green)" : "var(--surface)", border: dataSaver ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+    /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: dataSaver ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /* Quick Play */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -17099,10 +17122,16 @@ function FluxApp() {
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: "var(--dim)", marginBottom: 16, lineHeight: 1.6 } }, "Sign in to sync saves across devices and add friends."),
         /*#__PURE__*/React.createElement("button", { onClick: doFbSignIn, style: { padding: "11px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#4285f4,#34a853)", color: "#fff", border: "none", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 } }, "\uD83C\uDF10 Sign in with Google"),
         /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode("email"); setFbError(null); }, style: { padding: "11px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 } }, "\u2709\uFE0F Sign in with Email"),
-        /*#__PURE__*/React.createElement("button", { onClick: function() { setFbError(null); fbSignInAnon().catch(function(e) { setFbError(e.message); }); }, style: { padding: "9px 20px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "transparent", color: "var(--dim)", border: "1px solid var(--border)", width: "100%" } }, "Continue as Guest")
+        /*#__PURE__*/React.createElement("button", { onClick: function() { setFbError(null); fbSignInAnon().then(function() {
+          setShowAccount(false); setAuthMode("main");
+        }).catch(function(e) {
+          if (e.code === "auth/admin-restricted-operation") {
+            setFbError("Guest mode is not available. Please sign in with Google or Email.");
+          } else { setFbError(e.message || "Sign-in failed"); }
+        }); }, style: { padding: "9px 20px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "transparent", color: "var(--dim)", border: "1px solid var(--border)", width: "100%" } }, "Continue as Guest")
       ) :
       /*#__PURE__*/React.createElement(React.Fragment, null,
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 } }, authMode === "signup" ? "\u2728 Create New Account" : "\u2709\uFE0F Email Sign In"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 12 } }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } }, /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode("main"); setFbError(null); }, style: { padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, color: "var(--accent)", background: "rgba(255,94,120,0.1)", border: "1px solid rgba(255,94,120,0.3)" } }, "\u2190 Back")), authMode === "signup" ? "\u2728 Create New Account" : "\u2709\uFE0F Email Sign In"),
         /*#__PURE__*/React.createElement("input", { type: "email", value: authEmail, onChange: function(e) { setAuthEmail(e.target.value); }, placeholder: "Email address", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, marginBottom: 8 } }),
         /*#__PURE__*/React.createElement("input", { type: "password", value: authPass, onChange: function(e) { setAuthPass(e.target.value); }, placeholder: "Password", style: { width: "100%", padding: "10px 14px", borderRadius: 10, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, marginBottom: 12 } }),
         /*#__PURE__*/React.createElement("button", { onClick: function() {
@@ -17113,8 +17142,8 @@ function FluxApp() {
           else { fbSignInEmail(authEmail, authPass).catch(function(e) { setFbError(e.message); }); }
         }, style: { padding: "11px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: authMode === "signup" ? "linear-gradient(135deg,#4ade80,#22c55e)" : "linear-gradient(135deg,#c084fc,#818cf8)", color: "#fff", border: "none", width: "100%", marginBottom: 8 } }, authMode === "signup" ? "\u2728 Create Account" : "\uD83D\uDD12 Sign In"),
         /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between" } },
-          /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode("main"); setFbError(null); }, style: { fontSize: 11, color: "var(--dim)", background: "none", border: "none", textDecoration: "underline" } }, "\u2190 Back"),
-          /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode(authMode === "signup" ? "email" : "signup"); setFbError(null); }, style: { fontSize: 11, color: "var(--neon)", background: "none", border: "none", textDecoration: "underline" } }, authMode === "signup" ? "Have an account? Sign in" : "Create Account"))
+          
+          /*#__PURE__*/React.createElement("button", { onClick: function() { setAuthMode(authMode === "signup" ? "email" : "signup"); setFbError(null); }, style: { fontSize: 13, color: "var(--neon)", background: "rgba(192,132,252,0.1)", border: "1px solid rgba(192,132,252,0.3)", borderRadius: 8, padding: "6px 12px", fontWeight: 700, textDecoration: "none" } }, authMode === "signup" ? "Have an account? Sign in" : "\u2728 Create Account"))
       ),
       fbError && /*#__PURE__*/React.createElement("div", { style: { marginTop: 12, fontSize: 12, color: "var(--accent)", background: "rgba(255,94,120,0.1)", border: "1px solid rgba(255,94,120,0.3)", borderRadius: 8, padding: "8px 12px" } }, fbError)
     ) : /*#__PURE__*/React.createElement("div", null,

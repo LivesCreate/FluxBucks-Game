@@ -1,9 +1,9 @@
 [
   {
-    "id": 15,
+    "id": 16,
     "type": "update",
     "icon": "✨",
-    "title": "v5.0.3 — Stability Fixes",
-    "message": "UI fixes and stability improvements.\n\n• Fixed splash screen — FluxBucks text stays together\n• Scrollbars completely hidden on all platforms\n• Safer scroll lock for popups (no more black screen risk)\n• Player name button truncates long names properly\n• General stability improvements"
+    "title": "v5.0.4 — Big QoL Update",
+    "message": "Tons of quality-of-life improvements.\n\n• Fixed guest login error handling\n• Scroll lock now covers ALL popups\n• Fixed ghost box on wide screens\n• Account panel can't be closed accidentally\n• Back button in email sign-in is more visible\n• Data Saver moved to Customize panel\n• Recently Played can be toggled off\n• About section expanded with services, history, and known issues\n• APK warns before opening external links\n• Various UI fixes"
   }
 ]
