@@ -1,4 +1,4 @@
-var CACHE_NAME = 'flux-v5-0-5';
+var CACHE_NAME = 'flux-v5-1-0';
 var URLS_TO_CACHE = ['./', './index.html',
   'https://js.sentry-cdn.com/f3ee6f89f5a6d489c9a5d14f438bdeac.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',

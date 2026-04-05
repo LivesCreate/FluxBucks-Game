@@ -1,9 +1,9 @@
 [
   {
-    "id": 17,
+    "id": 19,
     "type": "update",
-    "icon": "✨",
-    "title": "v5.0.5 — Bug Fixes",
-    "message": "Critical bug fixes and gameplay improvements.\n\n• Fixed Stock Trader sell bug — profits now calculate correctly\n• Baccarat shows card placeholders before dealing\n• Baccarat guide updated with explicit card values (J/Q/K = 0)\n• Bomb Defuser hints now cost chips (scaled to bet size)\n• Password field shows minimum requirement\n• Username save shows confirmation\n• APK warns before Google sign-in redirect"
+    "icon": "🔥",
+    "title": "v5.1.0 — Combo & Income",
+    "message": "Big progression update!\n\n🔥 Combo Streaks — play different games in one session to earn a bonus multiplier on all wins (up to ×1.9)\n🏦 Bank Interest — earn passive income based on your tier every 4 hours\n🏆 Weekly Missions — 3 new challenges every week with chip rewards\n📊 Enhanced Stats — per-game win rate bars and analysis\n🔍 Accessibility Zoom — scale the app 50%–300% in Customize\n✨ Smoother animations throughout"
   }
 ]
