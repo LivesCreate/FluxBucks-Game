@@ -11152,13 +11152,14 @@ function StockTrader({
     clearInterval(timerRef.current);
     clearInterval(priceRef.current);
     setHolding(false);
-    var profit = Math.round((price - buyPrice) * bet / 100);
+    var rawProfit = (price - buyPrice) * bet / 100;
+    var profit = rawProfit > 0 ? Math.max(1, Math.round(rawProfit)) : rawProfit < 0 ? Math.min(-1, Math.round(rawProfit)) : 0;
     if (profit > 0) {
       endGame(profit, "Sold at $" + price + " (bought $" + buyPrice + ") +" + profit + " chips!");
     } else if (profit < 0) {
       endGame(profit, "Sold at $" + price + " (bought $" + buyPrice + ") " + profit + " chips");
     } else {
-      endGame(0, "Sold at $" + price + " — broke even. Entry fee lost.");
+      endGame(0, "Sold at $" + price + " (bought $" + buyPrice + ") — broke even.");
     }
   }
   function sell() {
@@ -14997,6 +14998,9 @@ function FluxApp() {
 
   // Track game results for achievements/stats/history
   function trackResult(event) {
+    /* Normalize: some games use event.event instead of event.type */
+    if (!event.type && event.event) event.type = event.event;
+    if (!event.event && event.type) event.event = event.type;
     try {
       if (navigator.vibrate) navigator.vibrate(event.type === "win" || event.event === "win" ? [50, 30, 50] : [80]);
     } catch (e) {}
@@ -15059,7 +15063,7 @@ function FluxApp() {
     })();
     /* Loss toast */
     var evT = event.event || event.type || "";
-    if (evT === "lose" && event.bet) {
+    if (evT === "lose" && event.bet && event.bet > 0) {
       if (lossToastTimer.current) clearTimeout(lossToastTimer.current);
       setLossToast({ amount: event.bet, game: event.game });
       lossToastTimer.current = setTimeout(function () { setLossToast(null); }, 2500);
@@ -15077,7 +15081,8 @@ function FluxApp() {
     };
     var pg = newStats.perGame[event.game];
     pg.played = (pg.played || 0) + 1;
-    if (event.type === "win") {
+    var _evWinLose = event.type || event.event || "";
+    if (_evWinLose === "win") {
       newStats.totalWon = (newStats.totalWon || 0) + 1;
       newStats.currentWinStreak = (newStats.currentWinStreak || 0) + 1;
       newStats.currentLoseStreak = 0;
@@ -15085,7 +15090,7 @@ function FluxApp() {
       if (event.profit > (newStats.biggestWin || 0)) newStats.biggestWin = event.profit;
       pg.won = (pg.won || 0) + 1;
       pg.currentLoseStreak = 0;
-    } else if (event.type === "lose") {
+    } else if (_evWinLose === "lose") {
       newStats.totalLost = (newStats.totalLost || 0) + 1;
       newStats.currentLoseStreak = (newStats.currentLoseStreak || 0) + 1;
       newStats.currentWinStreak = 0;
@@ -16571,7 +16576,7 @@ function FluxApp() {
       }),
       /*#__PURE__*/React.createElement("span", { style: { position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 9, color: "var(--dim)", pointerEvents: "none" } }, editUsername.length + "/30")),
     /*#__PURE__*/React.createElement("button", {
-      onClick: function () { if (savingName || editUsername === username) return; setSavingName(true); setUsername(editUsername); setTimeout(function () { setSavingName(false); setLossToast({ amount: 0, game: "save", isSave: true }); setTimeout(function() { setLossToast(null); }, 2000); }, 1200); },
+      onClick: function () { if (savingName || editUsername === username) return; setSavingName(true); setUsername(editUsername); setTimeout(function () { setSavingName(false); }, 1200); },
       disabled: savingName || editUsername === username,
       style: { width: 32, height: 32, borderRadius: 8, fontSize: 14, fontWeight: 700, opacity: (savingName || editUsername === username) ? 0.4 : 1, background: savingName ? "rgba(74,222,128,0.15)" : "var(--surface)", color: savingName ? "var(--green)" : "var(--dim)", border: savingName ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.3s", padding: 0 }
     }, savingName ? /*#__PURE__*/React.createElement("span", { style: { display: "inline-block", animation: "starRotate 1s linear infinite", fontSize: 12 } }, "⏳") : "✔")),
