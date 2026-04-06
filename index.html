@@ -277,8 +277,8 @@ var DEFAULT_SAVE = {
   passiveIncomeLastCollected: null,
   weeklyMissionsCompleted: null,
   weeklyMissionProgress: [],
-  accessibilityZoom: 100,
-  comboStreakBest: 0
+  comboStreakBest: 0,
+  pinchZoom: false
 };
 function loadSave() {
   try {
@@ -14711,8 +14711,8 @@ function FluxApp() {
   const [weeklyMissionProgress, setWeeklyMissionProgress] = useState(save.weeklyMissionProgress || [0, 0, 0]);
   const [weeklyGamesPlayed, setWeeklyGamesPlayed] = useState([]);
   const [showWeeklyMissions, setShowWeeklyMissions] = useState(false);
-  const [accessibilityZoom, setAccessibilityZoom] = useState(save.accessibilityZoom || 100);
   const [comboStreakBest, setComboStreakBest] = useState(save.comboStreakBest || 0);
+  const [pinchZoom, setPinchZoom] = useState(save.pinchZoom === true);
   const [showRecentGames, setShowRecentGames] = useState(function() { try { return localStorage.getItem("flux_show_recent") !== "0"; } catch(e) { return true; } });
   const [devLogRefresh, setDevLogRefresh] = useState(0);
   const [pendingDeletion, setPendingDeletion] = useState(null); /* main, email, signup */
@@ -14860,8 +14860,8 @@ function FluxApp() {
         passiveIncomeLastCollected: passiveIncomeLastCollected,
         weeklyMissionsCompleted: weeklyMissionsCompleted,
         weeklyMissionProgress: weeklyMissionProgress,
-        accessibilityZoom: accessibilityZoom,
-        comboStreakBest: comboStreakBest
+        comboStreakBest: comboStreakBest,
+        pinchZoom: pinchZoom
       };
       fbSaveToCloud(fbUser.uid, saveData).then(function (ok) {
         if (ok) setFbLastSync(new Date());
@@ -14869,7 +14869,7 @@ function FluxApp() {
       fbSaveProfile(fbUser.uid, saveData);
     }, interval);
     return function () { if (fbSyncTimer.current) clearTimeout(fbSyncTimer.current); };
-  }, [fbUser, cloudSyncEnabled, dataSaver, netInfo, chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, rouletteGoreSkull, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession, passiveIncomeLastCollected, weeklyMissionsCompleted, weeklyMissionProgress, accessibilityZoom, comboStreakBest]);
+  }, [fbUser, cloudSyncEnabled, dataSaver, netInfo, chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, rouletteGoreSkull, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession, passiveIncomeLastCollected, weeklyMissionsCompleted, weeklyMissionProgress, comboStreakBest, pinchZoom]);
 
   function doFbSignIn() {
     setFbError(null);
@@ -14990,11 +14990,11 @@ function FluxApp() {
       passiveIncomeLastCollected: passiveIncomeLastCollected,
       weeklyMissionsCompleted: weeklyMissionsCompleted,
       weeklyMissionProgress: weeklyMissionProgress,
-      accessibilityZoom: accessibilityZoom,
-      comboStreakBest: comboStreakBest
+      comboStreakBest: comboStreakBest,
+      pinchZoom: pinchZoom
     };
     writeSave(saveData);
-  }, [chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, rouletteGoreSkull, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession, dataSaver, passiveIncomeLastCollected, weeklyMissionsCompleted, weeklyMissionProgress, accessibilityZoom, comboStreakBest]);
+  }, [chips, safeMode, toastPos, username, quickPlay, theme, soundOn, avatar, bgPreset, autoLevelDismiss, rouletteGoreSkull, dailyChallengeCompleted, achievements, betHistory, balanceHistory, collection, stats, xp, lastPlayDate, dailyStreak, bestDailyStreak, longestSession, dataSaver, passiveIncomeLastCollected, weeklyMissionsCompleted, weeklyMissionProgress, comboStreakBest, pinchZoom]);
 
   // Track game results for achievements/stats/history
   function trackResult(event) {
@@ -15371,12 +15371,67 @@ function FluxApp() {
   }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup]);
 
   // Check safe mode achievement
+  /* ═══ POPUP SAFETY SYSTEM ═══ */
+  var _safetyTimer = useRef(null);
+  var [showEmergencyClose, setShowEmergencyClose] = useState(false);
+  function closeAllOverlays() {
+    setShowSettings(false); setShowProfile(false); setShowStats(false);
+    setShowAchievements(false); setShowInfo(false); setShowHelp(false);
+    setShowChangelog(false); setShowFeedback(false); setShowFriends(false);
+    setShowAccount(false); setShowLeaderboard(false); setGiftTarget(null);
+    setChallengeTarget(null); setShowDevConsole(false); setShowShop(false);
+    setShowDailyStreak(false); setShowAFK(false); setLevelUpData(null);
+    setDebtPopup(null); setShowShareCard(false); setShowWeeklyMissions(false);
+    setShowPassivePopup(null); setShowEmergencyClose(false);
+    setShowCustomize(false); setShowResetConfirm(false); setShowToastPicker(false);
+    setShowThemePicker(false); setShowAvatarPicker(false); setShowBgPicker(false);
+    setShowLookSoundPanel(false); setShowBgRequest(false); setShowReferral(false);
+    setGame(null);
+    try {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
+      document.documentElement.style.overflow = "";
+      var root = document.getElementById("root");
+      if (root) { root.style.transform = ""; root.style.width = ""; root.style.minHeight = ""; }
+    } catch(e) {}
+  }
+  useEffect(function() {
+    var anyOpen = false;
+    try { anyOpen = showSettings || showProfile || showStats || showAchievements || showInfo || showHelp || showChangelog || showFeedback || showFriends || showAccount || showLeaderboard || !!giftTarget || !!challengeTarget || showDevConsole || showShop || showDailyStreak || showAFK || !!levelUpData || !!debtPopup || showShareCard || showWeeklyMissions || !!showPassivePopup; } catch(e) {}
+    if (anyOpen) {
+      /* Safety: reset any root transforms that could push popups off-screen */
+      try {
+        var root = document.getElementById("root");
+        if (root && root.style.transform && root.style.transform !== "none" && root.style.transform !== "") {
+          root.style.transform = ""; root.style.transformOrigin = "";
+          root.style.width = ""; root.style.minHeight = "";
+        }
+      } catch(e) {}
+      /* Start emergency timer — if popup stuck for 20s, show escape button */
+      if (_safetyTimer.current) clearTimeout(_safetyTimer.current);
+      _safetyTimer.current = setTimeout(function() { setShowEmergencyClose(true); }, 20000);
+    } else {
+      setShowEmergencyClose(false);
+      if (_safetyTimer.current) { clearTimeout(_safetyTimer.current); _safetyTimer.current = null; }
+    }
+    return function() { if (_safetyTimer.current) clearTimeout(_safetyTimer.current); };
+  }, [showSettings, showProfile, showStats, showAchievements, showInfo, showHelp, showChangelog, showFeedback, showFriends, showAccount, showLeaderboard, giftTarget, challengeTarget, showDevConsole, showShop, showDailyStreak, showAFK, levelUpData, debtPopup, showShareCard, showWeeklyMissions, showPassivePopup]);
+
+
   useEffect(function () {
     applyTheme(theme);
   }, [theme]);
   useEffect(function () {
     window.__fluxSoundOff = !soundOn;
   }, [soundOn]);
+  useEffect(function () {
+    try {
+      var vp = document.querySelector('meta[name="viewport"]');
+      if (vp) { vp.setAttribute("content", "width=device-width, initial-scale=1.0, " + (pinchZoom ? "" : "maximum-scale=1.0, ") + "user-scalable=" + (pinchZoom ? "yes" : "no") + ", viewport-fit=cover"); }
+    } catch(e) {}
+  }, [pinchZoom]);
   useEffect(function () {
     window.__fluxBgPreset = bgPreset;
     var bs = BG_STYLES[bgPreset] || BG_STYLES["stars"];
@@ -15511,23 +15566,6 @@ function FluxApp() {
     }, 800);
   }, [splash, showDailyStreak]);
 
-  /* ═══ ACCESSIBILITY ZOOM ═══ */
-  useEffect(function () {
-    try {
-      var root = document.getElementById("root");
-      if (root && accessibilityZoom !== 100) {
-        root.style.transform = "scale(" + (accessibilityZoom / 100) + ")";
-        root.style.transformOrigin = "top center";
-        root.style.width = (10000 / accessibilityZoom) + "%";
-        root.style.minHeight = (10000 / accessibilityZoom) + "vh";
-      } else if (root) {
-        root.style.transform = "";
-        root.style.transformOrigin = "";
-        root.style.width = "";
-        root.style.minHeight = "";
-      }
-    } catch(e) {}
-  }, [accessibilityZoom]);
 
   /* ═══ SESSION TIMER ═══ */
   useEffect(function () {
@@ -17167,29 +17205,17 @@ function FluxApp() {
       /*#__PURE__*/React.createElement("button", { onClick: function () { setQuickPlay(function (q) { return !q; }); }, style: { width: 48, height: 28, borderRadius: 14, background: quickPlay ? "var(--green)" : "var(--surface)", border: quickPlay ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
         /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: quickPlay ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
 
-    /*#__PURE__*/React.createElement("div", {
-      style: { padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
-    }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDD0D"),
-      /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Accessibility Zoom")),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", marginBottom: 10 } }, "Scale the entire app. Current: " + accessibilityZoom + "%"),
-    /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "var(--dim)", fontWeight: 700 } }, "50%"),
-      /*#__PURE__*/React.createElement("input", { type: "range", min: 50, max: 300, step: 10, value: accessibilityZoom,
-        onChange: function(e) { setAccessibilityZoom(parseInt(e.target.value)); },
-        style: { flex: 1, accentColor: "var(--neon)", height: 4 } }),
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "var(--dim)", fontWeight: 700 } }, "300%")),
-    /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" } },
-      [75, 100, 125, 150, 200].map(function(z) {
-        return /*#__PURE__*/React.createElement("button", { key: "z-" + z, onClick: function() { setAccessibilityZoom(z); },
-          style: { padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700,
-            background: accessibilityZoom === z ? "var(--neon)" : "var(--surface)",
-            color: accessibilityZoom === z ? "#fff" : "var(--dim)",
-            border: accessibilityZoom === z ? "1px solid var(--neon)" : "1px solid var(--border)",
-            transition: "all 0.2s" } }, z + "%");
-      })),
-    accessibilityZoom !== 100 && /*#__PURE__*/React.createElement("button", { onClick: function() { setAccessibilityZoom(100); },
       style: { marginTop: 8, padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: "var(--accent)", color: "#fff", border: "none", width: "100%" } }, "Reset to 100%")),
+    /* ═══ Pinch to Zoom ═══ */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDD0D"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: "var(--text)" } }, "Pinch to Zoom")),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: "var(--dim)", lineHeight: 1.4, maxWidth: 200 } }, "Allow zooming with pinch gestures.")),
+      /*#__PURE__*/React.createElement("button", { onClick: function () { setPinchZoom(function (p) { return !p; }); }, style: { width: 48, height: 28, borderRadius: 14, background: pinchZoom ? "var(--green)" : "var(--surface)", border: pinchZoom ? "2px solid var(--green)" : "2px solid var(--border)", position: "relative", transition: "all 0.3s", flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: pinchZoom ? 24 : 2, transition: "left 0.3s cubic-bezier(0.34,1.56,0.64,1)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" } }))),
     /* ═══ Tap Outside to Close ═══ */
     /*#__PURE__*/React.createElement("div", {
       style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 10 }
@@ -17688,7 +17714,14 @@ function FluxApp() {
       })
     ),
     /*#__PURE__*/React.createElement("button", { onClick: function () { doRemoveFriend(viewingFriend.uid); setViewingFriend(null); }, style: { marginTop: 16, padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: "rgba(255,94,120,0.1)", color: "var(--accent)", border: "1px solid rgba(255,94,120,0.3)", width: "100%", textAlign: "center" } }, "\uD83D\uDDD1\uFE0F Remove Friend")
-  ))
+  )),
+  /* ═══ EMERGENCY CLOSE (soft-lock recovery) ═══ */
+  showEmergencyClose && /*#__PURE__*/React.createElement("div", {
+    style: { position: "fixed", top: 8, left: "50%", transform: "translateX(-50%)", zIndex: 99999, animation: "fadeUp 0.3s" }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: closeAllOverlays,
+    style: { padding: "10px 20px", borderRadius: 12, fontSize: 13, fontWeight: 800, background: "var(--accent)", color: "#fff", border: "2px solid rgba(255,255,255,0.3)", boxShadow: "0 4px 24px rgba(255,94,120,0.5)", letterSpacing: 0.5 }
+  }, "\u26A0\uFE0F Close All \u00D7"))
   );
 }
 var BG_STYLES = {
@@ -17780,9 +17813,12 @@ function Wrap({
   }, children));
 }
 
+
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(FluxApp, null));
 try { var _fl = document.getElementById("flux-loader"); if (_fl) { _fl.style.transition = "opacity 0.3s"; _fl.style.opacity = "0"; setTimeout(function() { _fl.remove(); }, 300); } } catch(e) {}
+/* One-time cleanup: remove any stuck zoom from old accessibilityZoom feature */
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js').then(function(r) { console.log('SW registered'); }).catch(function(e) { console.warn('SW failed:', e); }); }
+try { var _r = document.getElementById("root"); if (_r) { _r.style.transform = ""; _r.style.transformOrigin = ""; _r.style.width = ""; _r.style.minHeight = ""; } var _s = localStorage.getItem("flux_save_v3"); if (_s && _s.indexOf("accessibilityZoom") >= 0) { var _d = JSON.parse(_s); delete _d.accessibilityZoom; localStorage.setItem("flux_save_v3", JSON.stringify(_d)); } } catch(e) {}
 </script>
 
 
